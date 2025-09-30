@@ -291,9 +291,9 @@
                         }
                         updateProgress(20, '引擎主程序加载完毕...', true);
 
-                        // 适配对象引用
-                        const FFmpegClass = window.FFmpegWASM && window.FFmpegWASM.FFmpeg;
-                        const fetchFile = (window.FFmpegUtil && window.FFmpegUtil.fetchFile) || (window.FFmpegWASM && window.FFmpegWASM.fetchFile);
+                        // 适配对象引用（兼容 UMD 全局与旧命名）
+                        const FFmpegClass = (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) || window.FFmpeg;
+                        const fetchFile = (window.FFmpegUtil && window.FFmpegUtil.fetchFile) || (window.FFmpegWASM && window.FFmpegWASM.fetchFile) || window.fetchFile;
 
                         if (typeof FFmpegClass !== 'function') {
                             throw new Error(`FFmpeg不是构造函数，类型为: ${typeof FFmpegClass}`);
