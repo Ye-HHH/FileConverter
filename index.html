@@ -273,7 +273,8 @@
                             throw new Error('FFmpeg库加载失败，无法找到FFmpeg对象');
                         }
 
-                        const ffmpeg = new FFmpeg({ log: true });
+                        // 适配FFmpeg 0.11.6版本的构造函数语法
+                        const ffmpeg = new FFmpeg();
 
                         ffmpeg.on('log', ({ message }) => console.log(message));
                         ffmpeg.on('progress', ({ progress }) => {
