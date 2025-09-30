@@ -412,7 +412,15 @@
 
                 const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${formatSelect.value}`;
                 await ffmpeg.writeFile(file.name, await fetchFile(file));
-                await ffmpeg.exec(['-i', file.name, outputFilename]);
+                let args = ['-i', file.name];
+                // 对 M4V 使用“重封装”（不重新编码），大幅提高成功率
+                if (type === '视频' && formatSelect.value === 'm4v') {
+                    args.push('-c', 'copy', '-map', '0', '-movflags', 'faststart', '-f', 'mp4', outputFilename);
+                } else {
+                    // 默认策略：让 ffmpeg 根据后缀决定容器/编码
+                    args.push(outputFilename);
+                }
+                await ffmpeg.exec(args);
 
                 const data = await ffmpeg.readFile(outputFilename);
                 const blob = new Blob([data.buffer]);
