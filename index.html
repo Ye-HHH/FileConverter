@@ -6,10 +6,7 @@
     <title>多功能文件格式转换器</title>
     <!-- 引入Tailwind CSS以实现快速、现代化的UI设计 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 升级 FFmpeg.wasm 到更兼容的 v0.12.6 版本 -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js" defer></script>
-    <!-- 引入jsPDF库用于生成PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <!-- 注意：核心库JS文件已从此移除，将由脚本按需动态加载 -->
     <style>
         /* 自定义样式，增强用户体验 */
         body {
@@ -153,232 +150,225 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        
+        // --- 核心修改：移除启动时的库加载等待，UI立即初始化 ---
 
-        function runApp() {
-            // --- 核心逻辑 ---
-            const { FFmpeg, fetchFile } = window.FFmpeg;
-            let ffmpeg = new FFmpeg();
-            let ffmpegLoaded = false;
+        // --- 懒加载库的状态管理 ---
+        let ffmpegLoadPromise = null;
+        let jsPDFLoadPromise = null;
 
-            // --- DOM元素获取 ---
-            const statusArea = document.getElementById('status-area');
-            const progressBar = document.getElementById('progress-bar');
-            const statusText = document.getElementById('status-text');
-            const statusLoader = document.getElementById('status-loader');
-
-            const tabs = document.querySelectorAll('.tab-button');
-            const panels = document.querySelectorAll('.converter-panel');
-            
-            const videoDropZone = document.getElementById('video-drop-zone');
-            const videoInput = document.getElementById('video-input');
-            const videoConvertBtn = document.getElementById('video-convert-btn');
-            const videoFormatSelect = document.getElementById('video-format');
-            let videoFile = null;
-
-            const audioDropZone = document.getElementById('audio-drop-zone');
-            const audioInput = document.getElementById('audio-input');
-            const audioConvertBtn = document.getElementById('audio-convert-btn');
-            const audioFormatSelect = document.getElementById('audio-format');
-            let audioFile = null;
-
-            const imageDropZone = document.getElementById('image-drop-zone');
-            const imageInput = document.getElementById('image-input');
-            const imageConvertBtn = document.getElementById('image-convert-btn');
-            const imageFormatSelect = document.getElementById('image-format');
-            let imageFile = null;
-
-            const docDropZone = document.getElementById('doc-drop-zone');
-            const docInput = document.getElementById('doc-input');
-            const docConvertBtn = document.getElementById('doc-convert-btn');
-            const docPreview = document.getElementById('doc-preview');
-            let docFiles = [];
-            
-            // --- 统一的进度更新函数 ---
-            function updateProgress(percentage, message, showLoader = false) {
-                statusArea.classList.remove('hidden');
-                progressBar.style.width = `${percentage}%`;
-                statusText.textContent = message;
-                statusLoader.classList.toggle('hidden', !showLoader);
-
-                if (message.includes('成功')) {
-                    progressBar.classList.remove('bg-red-500','bg-blue-600');
-                    progressBar.classList.add('bg-green-500');
-                } else if (message.includes('错误')) {
-                    progressBar.classList.remove('bg-green-500','bg-blue-600');
-                    progressBar.classList.add('bg-red-500');
-                } else {
-                    progressBar.classList.remove('bg-green-500', 'bg-red-500');
-                    progressBar.classList.add('bg-blue-600');
-                }
+        // --- DOM元素获取 ---
+        const statusArea = document.getElementById('status-area');
+        const progressBar = document.getElementById('progress-bar');
+        const statusText = document.getElementById('status-text');
+        const statusLoader = document.getElementById('status-loader');
+        const tabs = document.querySelectorAll('.tab-button');
+        const panels = document.querySelectorAll('.converter-panel');
+        const videoDropZone = document.getElementById('video-drop-zone');
+        const videoInput = document.getElementById('video-input');
+        const videoConvertBtn = document.getElementById('video-convert-btn');
+        const videoFormatSelect = document.getElementById('video-format');
+        let videoFile = null;
+        const audioDropZone = document.getElementById('audio-drop-zone');
+        const audioInput = document.getElementById('audio-input');
+        const audioConvertBtn = document.getElementById('audio-convert-btn');
+        const audioFormatSelect = document.getElementById('audio-format');
+        let audioFile = null;
+        const imageDropZone = document.getElementById('image-drop-zone');
+        const imageInput = document.getElementById('image-input');
+        const imageConvertBtn = document.getElementById('image-convert-btn');
+        const imageFormatSelect = document.getElementById('image-format');
+        let imageFile = null;
+        const docDropZone = document.getElementById('doc-drop-zone');
+        const docInput = document.getElementById('doc-input');
+        const docConvertBtn = document.getElementById('doc-convert-btn');
+        const docPreview = document.getElementById('doc-preview');
+        let docFiles = [];
+        
+        // --- 统一的进度更新函数 ---
+        function updateProgress(percentage, message, showLoader = false) {
+            statusArea.classList.remove('hidden');
+            progressBar.style.width = `${percentage}%`;
+            statusText.textContent = message;
+            statusLoader.classList.toggle('hidden', !showLoader);
+            if (message.includes('成功')) {
+                progressBar.classList.remove('bg-red-500','bg-blue-600');
+                progressBar.classList.add('bg-green-500');
+            } else if (message.includes('错误')) {
+                progressBar.classList.remove('bg-green-500','bg-blue-600');
+                progressBar.classList.add('bg-red-500');
+            } else {
+                progressBar.classList.remove('bg-green-500', 'bg-red-500');
+                progressBar.classList.add('bg-blue-600');
             }
+        }
 
-
-            // --- 初始化FFmpeg (按需加载) ---
-            async function loadFFmpeg() {
-                if (ffmpegLoaded || ffmpeg.loaded) return true;
-                updateProgress(0, '正在加载转换引擎 (FFmpeg)...', true);
-                try {
-                    await ffmpeg.load({
-                        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
-                    });
-                    
-                    ffmpeg.on('log', ({ message }) => { console.log(message); });
-                    ffmpeg.on('progress', ({ progress }) => {
-                        if (progress >= 0 && progress <= 1) {
-                            const percentage = progress * 100;
-                            updateProgress(percentage, `正在转换: ${percentage.toFixed(1)}%`, true);
-                        }
-                    });
-
-                    ffmpegLoaded = true;
-                    updateProgress(100, '转换引擎已就绪！');
-                    return true;
-                } catch (error) {
-                    console.error("FFmpeg 加载失败:", error);
-                    updateProgress(100, '错误：转换引擎加载失败，请刷新页面重试。');
-                    ffmpeg = new FFmpeg();
-                    return false;
+        // --- 动态脚本加载器 ---
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const existingScript = document.querySelector(`script[src="${src}"]`);
+                if (existingScript) {
+                    return resolve();
                 }
-            }
-            
-            // --- UI交互逻辑 ---
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const targetPanel = document.getElementById(`${tab.dataset.tab}-converter`);
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    panels.forEach(p => p.classList.add('hidden'));
-                    targetPanel.classList.remove('hidden');
-                    statusArea.classList.add('hidden');
-                });
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error(`Script load error for ${src}`));
+                document.head.appendChild(script);
             });
+        }
 
-            function setupDropZone(dropZone, input, fileHandler) {
-                dropZone.addEventListener('click', () => input.click());
-                dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-                dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
-                dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('drag-over');
-                    if (e.dataTransfer.files.length) {
-                        input.files = e.dataTransfer.files;
-                        fileHandler({ target: input });
+        // --- 按需获取FFmpeg实例 ---
+        function getFFmpeg() {
+            if (!ffmpegLoadPromise) {
+                ffmpegLoadPromise = new Promise(async (resolve, reject) => {
+                    try {
+                        updateProgress(0, '首次加载转换引擎 (FFmpeg)...', true);
+                        if (!window.FFmpeg) {
+                            await loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js');
+                        }
+                        const { FFmpeg, fetchFile } = window.FFmpeg;
+                        const ffmpeg = new FFmpeg();
+                        ffmpeg.on('log', ({ message }) => console.log(message));
+                        ffmpeg.on('progress', ({ progress }) => {
+                            if (progress >= 0 && progress <= 1) {
+                                const percentage = progress * 100;
+                                updateProgress(percentage, `正在转换: ${percentage.toFixed(1)}%`, true);
+                            }
+                        });
+                        await ffmpeg.load({ coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
+                        updateProgress(100, '引擎已就绪！');
+                        resolve({ ffmpeg, fetchFile });
+                    } catch (err) {
+                        ffmpegLoadPromise = null; // 失败时重置，以便下次重试
+                        updateProgress(100, '错误：引擎加载失败。');
+                        reject(err);
                     }
                 });
-                input.addEventListener('change', fileHandler);
             }
+            return ffmpegLoadPromise;
+        }
 
-            // --- 文件处理逻辑 ---
-            setupDropZone(videoDropZone, videoInput, (e) => {
-                videoFile = e.target.files[0];
-                if (videoFile) {
-                    videoDropZone.querySelector('p').textContent = `已选择: ${videoFile.name}`;
-                    videoConvertBtn.disabled = false;
-                }
-            });
-            setupDropZone(audioDropZone, audioInput, (e) => {
-                audioFile = e.target.files[0];
-                if (audioFile) {
-                    audioDropZone.querySelector('p').textContent = `已选择: ${audioFile.name}`;
-                    audioConvertBtn.disabled = false;
-                }
-            });
-            setupDropZone(imageDropZone, imageInput, (e) => {
-                imageFile = e.target.files[0];
-                if (imageFile) {
-                    imageDropZone.querySelector('p').textContent = `已选择: ${imageFile.name}`;
-                    imageConvertBtn.disabled = false;
-                }
-            });
-            setupDropZone(docDropZone, docInput, (e) => {
-                docFiles = Array.from(e.target.files);
-                docPreview.innerHTML = '';
-                if (docFiles.length > 0) {
-                    docDropZone.querySelector('p').textContent = `已选择 ${docFiles.length} 个文件`;
-                    docConvertBtn.disabled = false;
-                    docFiles.forEach(file => {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const imgEl = document.createElement('img');
-                            imgEl.src = event.target.result;
-                            imgEl.className = 'w-full h-auto object-cover rounded-md shadow-sm';
-                            docPreview.appendChild(imgEl);
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                }
-            });
-            
-            // --- 转换执行逻辑 ---
-            async function performFFmpegConversion(inputFile, outputFilename) {
-                updateProgress(0, '准备转换...', true);
-                try {
-                    await ffmpeg.writeFile(inputFile.name, await fetchFile(inputFile));
-                    await ffmpeg.exec(['-i', inputFile.name, outputFilename]);
-                    const data = await ffmpeg.readFile(outputFilename);
-                    return new Blob([data.buffer]);
-                } finally {
+        // --- 按需获取jsPDF实例 ---
+        function getJsPDF() {
+            if (!jsPDFLoadPromise) {
+                 jsPDFLoadPromise = new Promise(async (resolve, reject) => {
                     try {
-                        await ffmpeg.deleteFile(inputFile.name);
-                        await ffmpeg.deleteFile(outputFilename);
-                    } catch(e) {}
-                }
+                        updateProgress(0, '首次加载PDF生成库...', true);
+                        if (!window.jspdf) {
+                            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+                        }
+                        updateProgress(100, 'PDF库已就绪！');
+                        resolve(window.jspdf.jsPDF);
+                    } catch(err) {
+                        jsPDFLoadPromise = null; // 失败时重置
+                        updateProgress(100, '错误：PDF库加载失败。');
+                        reject(err);
+                    }
+                 });
             }
+            return jsPDFLoadPromise;
+        }
 
-            async function handleFFmpegConvert(file, formatSelect, type) {
-                if (!file) return;
-                
-                if (!ffmpegLoaded) {
-                    const loaded = await loadFFmpeg();
-                    if (!loaded) return;
-                }
-
-                const format = formatSelect.value;
-                const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${format}`;
-                try {
-                    const blob = await performFFmpegConversion(file, outputFilename);
-                    const url = URL.createObjectURL(blob);
-                    triggerDownload(url, outputFilename);
-                    updateProgress(100, '转换成功！已开始下载。');
-                } catch (error) {
-                    console.error(`${type}转换失败:`, error);
-                    updateProgress(100, `错误：${type}转换失败。`);
-                }
-            }
-            
-            videoConvertBtn.addEventListener('click', () => handleFFmpegConvert(videoFile, videoFormatSelect, '视频'));
-            audioConvertBtn.addEventListener('click', () => handleFFmpegConvert(audioFile, audioFormatSelect, '音频'));
-            
-            imageConvertBtn.addEventListener('click', () => {
-                if (!imageFile) return;
-                updateProgress(0, '正在转换...', true);
-                const format = imageFormatSelect.value;
-                const mimeType = `image/${format}`;
-                const outputFilename = `${imageFile.name.split('.').slice(0, -1).join('.')}.${format}`;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        canvas.toBlob((blob) => {
-                            const url = URL.createObjectURL(blob);
-                            triggerDownload(url, outputFilename);
-                            updateProgress(100, '转换成功！已开始下载。');
-                        }, mimeType, 0.95);
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(imageFile);
+        // --- UI交互逻辑 ---
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetPanel = document.getElementById(`${tab.dataset.tab}-converter`);
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                panels.forEach(p => p.classList.add('hidden'));
+                targetPanel.classList.remove('hidden');
+                statusArea.classList.add('hidden');
             });
+        });
 
-            docConvertBtn.addEventListener('click', async () => {
-                if (docFiles.length === 0) return;
-                updateProgress(0, '正在生成PDF...', true);
-                const { jsPDF } = window.jspdf;
+        function setupDropZone(dropZone, input, fileHandler) {
+            dropZone.addEventListener('click', () => input.click());
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+            dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                if (e.dataTransfer.files.length) {
+                    input.files = e.dataTransfer.files;
+                    fileHandler({ target: input });
+                }
+            });
+            input.addEventListener('change', fileHandler);
+        }
+
+        // --- 文件处理逻辑 ---
+        setupDropZone(videoDropZone, videoInput, (e) => { videoFile = e.target.files[0]; if (videoFile) { videoDropZone.querySelector('p').textContent = `已选择: ${videoFile.name}`; videoConvertBtn.disabled = false; } });
+        setupDropZone(audioDropZone, audioInput, (e) => { audioFile = e.target.files[0]; if (audioFile) { audioDropZone.querySelector('p').textContent = `已选择: ${audioFile.name}`; audioConvertBtn.disabled = false; } });
+        setupDropZone(imageDropZone, imageInput, (e) => { imageFile = e.target.files[0]; if (imageFile) { imageDropZone.querySelector('p').textContent = `已选择: ${imageFile.name}`; imageConvertBtn.disabled = false; } });
+        setupDropZone(docDropZone, docInput, (e) => {
+            docFiles = Array.from(e.target.files);
+            docPreview.innerHTML = '';
+            if (docFiles.length > 0) {
+                docDropZone.querySelector('p').textContent = `已选择 ${docFiles.length} 个文件`;
+                docConvertBtn.disabled = false;
+                docFiles.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => { const imgEl = document.createElement('img'); imgEl.src = event.target.result; imgEl.className = 'w-full h-auto object-cover rounded-md shadow-sm'; docPreview.appendChild(imgEl); };
+                    reader.readAsDataURL(file);
+                });
+            }
+        });
+        
+        // --- 转换执行逻辑 ---
+        async function handleFFmpegConvert(file, formatSelect, type) {
+            if (!file) return;
+            try {
+                const { ffmpeg, fetchFile } = await getFFmpeg();
+                updateProgress(0, '准备转换...', true);
+                const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${formatSelect.value}`;
+                await ffmpeg.writeFile(file.name, await fetchFile(file));
+                await ffmpeg.exec(['-i', file.name, outputFilename]);
+                const data = await ffmpeg.readFile(outputFilename);
+                const blob = new Blob([data.buffer]);
+                const url = URL.createObjectURL(blob);
+                triggerDownload(url, outputFilename);
+                updateProgress(100, '转换成功！已开始下载。');
+                await ffmpeg.deleteFile(file.name);
+                await ffmpeg.deleteFile(outputFilename);
+            } catch (error) {
+                console.error(`${type}转换失败:`, error);
+                updateProgress(100, `错误：${type}转换失败。`);
+            }
+        }
+        
+        videoConvertBtn.addEventListener('click', () => handleFFmpegConvert(videoFile, videoFormatSelect, '视频'));
+        audioConvertBtn.addEventListener('click', () => handleFFmpegConvert(audioFile, audioFormatSelect, '音频'));
+        
+        imageConvertBtn.addEventListener('click', () => {
+            if (!imageFile) return;
+            updateProgress(0, '正在转换...', true);
+            const format = imageFormatSelect.value;
+            const mimeType = `image/${format}`;
+            const outputFilename = `${imageFile.name.split('.').slice(0, -1).join('.')}.${format}`;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        triggerDownload(url, outputFilename);
+                        updateProgress(100, '转换成功！已开始下载。');
+                    }, mimeType, 0.95);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(imageFile);
+        });
+
+        docConvertBtn.addEventListener('click', async () => {
+            if (docFiles.length === 0) return;
+            try {
+                const jsPDF = await getJsPDF();
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 for (let i = 0; i < docFiles.length; i++) {
                     const file = docFiles[i];
@@ -398,56 +388,16 @@
                 }
                 pdf.save('converted.pdf');
                 updateProgress(100, 'PDF生成成功！已开始下载。');
-            });
-            
-            function triggerDownload(url, filename) {
-                const a = document.createElement('a'); a.href = url; a.download = filename;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            } catch (error) {
+                 console.error("PDF生成失败:", error);
+                 updateProgress(100, `错误：PDF生成失败。`);
             }
-            function readFileAsDataURL(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result); reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            }
-            function loadImage(src) {
-                return new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.onload = () => resolve(img); img.onerror = reject;
-                    img.src = src;
-                });
-            }
-        }
-
-        // 修正：启动带超时的初始化检查器
-        function initializeConverter(startTime = Date.now()) {
-            const TIMEOUT = 10000; // 10秒超时
-
-            if (window.FFmpeg && window.jspdf) {
-                runApp();
-                return;
-            }
-
-            if (Date.now() - startTime > TIMEOUT) {
-                console.error("核心库加载超时。");
-                const statusArea = document.getElementById('status-area');
-                const progressBar = document.getElementById('progress-bar');
-                const statusText = document.getElementById('status-text');
-                if (statusArea && statusText && progressBar) {
-                    statusArea.classList.remove('hidden');
-                    statusText.textContent = '错误：核心库加载超时，请检查网络或浏览器插件后重试。';
-                    progressBar.style.width = '100%';
-                    progressBar.classList.add('bg-red-500');
-                }
-                return;
-            }
-            
-            setTimeout(() => initializeConverter(startTime), 100);
-        }
+        });
         
-        initializeConverter();
+        // --- 辅助函数 ---
+        function triggerDownload(url, filename) { const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
+        function readFileAsDataURL(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+        function loadImage(src) { return new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = src; }); }
     });
     </script>
 </body>
