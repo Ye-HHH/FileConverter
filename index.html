@@ -237,7 +237,7 @@
                     try {
                         updateProgress(0, '加载引擎主程序...', true);
                         if (!window.FFmpegWASM) {
-                            const primarySrc = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js';
+                            const primarySrc = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
                             await loadScript(primarySrc);
                         }
                         updateProgress(20, '引擎主程序加载完毕...', true);
@@ -253,21 +253,14 @@
                         });
                         
                         updateProgress(25, '正在下载核心组件...', true);
-                        // CORS修复：使用单线程版本避免Worker跨域问题
-                        const primaryBaseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/';
+                        // CORS修复：使用0.11.6版本的单线程核心
+                        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/';
 
-                        // 使用单线程版本，只需要两个文件
-                        const [coreURL, wasmURL] = await Promise.all([
-                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.js'),
-                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.wasm')
-                        ]);
-                        updateProgress(50, '核心组件下载完毕，正在初始化引擎...', true);
-
-                        // 使用单线程版本加载
-                        await ffmpeg.load({ coreURL, wasmURL });
-
-                        URL.revokeObjectURL(coreURL);
-                        URL.revokeObjectURL(wasmURL);
+                        await ffmpeg.load({
+                            coreURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.js'),
+                            wasmURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.wasm')
+                        });
+                        updateProgress(50, '核心组件加载完毕，正在初始化引擎...', true);
 
                         updateProgress(100, '引擎已就绪！');
                         resolve({ ffmpeg, fetchFile });
