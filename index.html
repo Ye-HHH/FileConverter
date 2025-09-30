@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多功能文件格式转换器</title>
+    <!-- 引入Tailwind CSS以实现快速、现代化的UI设计 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 升级 FFmpeg.wasm 到更兼容的 v0.12.6 版本 -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js" defer></script>
+    <!-- 引入jsPDF库用于生成PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <style>
+        /* 自定义样式，增强用户体验 */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .tab-button.active {
+            border-color: #3B82F6;
+            background-color: #3B82F6;
+            color: white;
+        }
+        .drop-zone {
+            border: 2px dashed #9CA3AF;
+            transition: all 0.3s ease;
+        }
+        .drop-zone.drag-over {
+            border-color: #3B82F6;
+            background-color: #EFF6FF;
+        }
+        /* 加载动画 */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3B82F6;
+            border-radius: 50%;
+            width: 20px; /* 缩小加载动画尺寸以适应进度条区域 */
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 md:p-8">
+        
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">All-in-One 格式转换器</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">纯前端实现，保护您的文件隐私与安全。</p>
+        </header>
+
+        <!-- Tab导航 -->
+        <div class="flex flex-wrap justify-center border-b border-gray-200 dark:border-gray-700 mb-6">
+            <button data-tab="video" class="tab-button active text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">视频转换</button>
+            <button data-tab="audio" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">音频转换</button>
+            <button data-tab="image" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">图片转换</button>
+            <button data-tab="document" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">图片转PDF</button>
+        </div>
+
+        <!-- 转换器内容区域 -->
+        <main>
+            <!-- 视频转换器 -->
+            <div id="video-converter" class="converter-panel">
+                <p class="text-center text-gray-600 dark:text-gray-400 mb-4">支持 MP4, MOV, AVI, WEBM 等格式互转。</p>
+                <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="video-drop-zone">
+                    <p class="text-gray-500">拖拽视频文件至此，或 <span class="text-blue-500 font-semibold">点击选择</span></p>
+                    <input type="file" id="video-input" class="hidden" accept="video/*">
+                </div>
+                <div class="mt-4 text-center">
+                    <label for="video-format" class="mr-2 font-medium">转换为:</label>
+                    <select id="video-format" class="rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="mp4">MP4</option>
+                        <option value="webm">WEBM</option>
+                        <option value="avi">AVI</option>
+                        <option value="mov">MOV</option>
+                        <option value="gif">GIF (动图)</option>
+                    </select>
+                </div>
+                <div class="text-center mt-6">
+                    <button id="video-convert-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>开始转换</button>
+                </div>
+            </div>
+
+            <!-- 音频转换器 -->
+            <div id="audio-converter" class="converter-panel hidden">
+                <p class="text-center text-gray-600 dark:text-gray-400 mb-4">支持 MP3, WAV, OGG, M4A 等格式互转。</p>
+                <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="audio-drop-zone">
+                    <p class="text-gray-500">拖拽音频文件至此，或 <span class="text-blue-500 font-semibold">点击选择</span></p>
+                    <input type="file" id="audio-input" class="hidden" accept="audio/*">
+                </div>
+                <div class="mt-4 text-center">
+                    <label for="audio-format" class="mr-2 font-medium">转换为:</label>
+                    <select id="audio-format" class="rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="mp3">MP3</option>
+                        <option value="wav">WAV</option>
+                        <option value="ogg">OGG</option>
+                        <option value="m4a">M4A</option>
+                    </select>
+                </div>
+                <div class="text-center mt-6">
+                    <button id="audio-convert-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>开始转换</button>
+                </div>
+            </div>
+
+            <!-- 图片转换器 -->
+            <div id="image-converter" class="converter-panel hidden">
+                <p class="text-center text-gray-600 dark:text-gray-400 mb-4">支持 PNG, JPG, WEBP, BMP 等格式互转。</p>
+                <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="image-drop-zone">
+                    <p class="text-gray-500">拖拽图片文件至此，或 <span class="text-blue-500 font-semibold">点击选择</span></p>
+                    <input type="file" id="image-input" class="hidden" accept="image/*">
+                </div>
+                <div class="mt-4 text-center">
+                    <label for="image-format" class="mr-2 font-medium">转换为:</label>
+                    <select id="image-format" class="rounded-md border-gray-300 dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="png">PNG</option>
+                        <option value="jpeg">JPEG</option>
+                        <option value="webp">WEBP</option>
+                        <option value="bmp">BMP</option>
+                    </select>
+                </div>
+                 <div class="text-center mt-6">
+                    <button id="image-convert-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>开始转换</button>
+                </div>
+            </div>
+
+            <!-- 图片转PDF转换器 -->
+            <div id="document-converter" class="converter-panel hidden">
+                 <p class="text-center text-gray-600 dark:text-gray-400 mb-4">选择多张图片，将它们合并成一个PDF文件。</p>
+                 <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="doc-drop-zone">
+                    <p class="text-gray-500">拖拽图片文件至此，或 <span class="text-blue-500 font-semibold">点击选择</span></p>
+                    <input type="file" id="doc-input" class="hidden" accept="image/*" multiple>
+                </div>
+                <div id="doc-preview" class="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+                 <div class="text-center mt-6">
+                    <button id="doc-convert-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>合并为PDF</button>
+                </div>
+            </div>
+            
+            <!-- 通用状态和进度条显示区域 -->
+            <div id="status-area" class="mt-6 text-center space-y-3 hidden">
+                <div class="flex items-center justify-center space-x-2">
+                    <div id="status-loader" class="loader hidden"></div>
+                    <p id="status-text" class="text-sm text-gray-600 dark:text-gray-400"></p>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        function runApp() {
+            // --- 核心逻辑 ---
+            const { FFmpeg, fetchFile } = window.FFmpeg;
+            let ffmpeg = new FFmpeg();
+            let ffmpegLoaded = false;
+
+            // --- DOM元素获取 ---
+            const statusArea = document.getElementById('status-area');
+            const progressBar = document.getElementById('progress-bar');
+            const statusText = document.getElementById('status-text');
+            const statusLoader = document.getElementById('status-loader');
+
+            const tabs = document.querySelectorAll('.tab-button');
+            const panels = document.querySelectorAll('.converter-panel');
+            
+            const videoDropZone = document.getElementById('video-drop-zone');
+            const videoInput = document.getElementById('video-input');
+            const videoConvertBtn = document.getElementById('video-convert-btn');
+            const videoFormatSelect = document.getElementById('video-format');
+            let videoFile = null;
+
+            const audioDropZone = document.getElementById('audio-drop-zone');
+            const audioInput = document.getElementById('audio-input');
+            const audioConvertBtn = document.getElementById('audio-convert-btn');
+            const audioFormatSelect = document.getElementById('audio-format');
+            let audioFile = null;
+
+            const imageDropZone = document.getElementById('image-drop-zone');
+            const imageInput = document.getElementById('image-input');
+            const imageConvertBtn = document.getElementById('image-convert-btn');
+            const imageFormatSelect = document.getElementById('image-format');
+            let imageFile = null;
+
+            const docDropZone = document.getElementById('doc-drop-zone');
+            const docInput = document.getElementById('doc-input');
+            const docConvertBtn = document.getElementById('doc-convert-btn');
+            const docPreview = document.getElementById('doc-preview');
+            let docFiles = [];
+            
+            // --- 统一的进度更新函数 ---
+            function updateProgress(percentage, message, showLoader = false) {
+                statusArea.classList.remove('hidden');
+                progressBar.style.width = `${percentage}%`;
+                statusText.textContent = message;
+                statusLoader.classList.toggle('hidden', !showLoader);
+
+                if (message.includes('成功')) {
+                    progressBar.classList.remove('bg-red-500','bg-blue-600');
+                    progressBar.classList.add('bg-green-500');
+                } else if (message.includes('错误')) {
+                    progressBar.classList.remove('bg-green-500','bg-blue-600');
+                    progressBar.classList.add('bg-red-500');
+                } else {
+                    progressBar.classList.remove('bg-green-500', 'bg-red-500');
+                    progressBar.classList.add('bg-blue-600');
+                }
+            }
+
+
+            // --- 初始化FFmpeg (按需加载) ---
+            async function loadFFmpeg() {
+                if (ffmpegLoaded || ffmpeg.loaded) return true;
+                updateProgress(0, '正在加载转换引擎 (FFmpeg)...', true);
+                try {
+                    await ffmpeg.load({
+                        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
+                    });
+                    
+                    ffmpeg.on('log', ({ message }) => { console.log(message); });
+                    ffmpeg.on('progress', ({ progress }) => {
+                        if (progress >= 0 && progress <= 1) {
+                            const percentage = progress * 100;
+                            updateProgress(percentage, `正在转换: ${percentage.toFixed(1)}%`, true);
+                        }
+                    });
+
+                    ffmpegLoaded = true;
+                    updateProgress(100, '转换引擎已就绪！');
+                    return true;
+                } catch (error) {
+                    console.error("FFmpeg 加载失败:", error);
+                    updateProgress(100, '错误：转换引擎加载失败，请刷新页面重试。');
+                    ffmpeg = new FFmpeg();
+                    return false;
+                }
+            }
+            
+            // --- UI交互逻辑 ---
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetPanel = document.getElementById(`${tab.dataset.tab}-converter`);
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    panels.forEach(p => p.classList.add('hidden'));
+                    targetPanel.classList.remove('hidden');
+                    statusArea.classList.add('hidden');
+                });
+            });
+
+            function setupDropZone(dropZone, input, fileHandler) {
+                dropZone.addEventListener('click', () => input.click());
+                dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+                dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                    if (e.dataTransfer.files.length) {
+                        input.files = e.dataTransfer.files;
+                        fileHandler({ target: input });
+                    }
+                });
+                input.addEventListener('change', fileHandler);
+            }
+
+            // --- 文件处理逻辑 ---
+            setupDropZone(videoDropZone, videoInput, (e) => {
+                videoFile = e.target.files[0];
+                if (videoFile) {
+                    videoDropZone.querySelector('p').textContent = `已选择: ${videoFile.name}`;
+                    videoConvertBtn.disabled = false;
+                }
+            });
+            setupDropZone(audioDropZone, audioInput, (e) => {
+                audioFile = e.target.files[0];
+                if (audioFile) {
+                    audioDropZone.querySelector('p').textContent = `已选择: ${audioFile.name}`;
+                    audioConvertBtn.disabled = false;
+                }
+            });
+            setupDropZone(imageDropZone, imageInput, (e) => {
+                imageFile = e.target.files[0];
+                if (imageFile) {
+                    imageDropZone.querySelector('p').textContent = `已选择: ${imageFile.name}`;
+                    imageConvertBtn.disabled = false;
+                }
+            });
+            setupDropZone(docDropZone, docInput, (e) => {
+                docFiles = Array.from(e.target.files);
+                docPreview.innerHTML = '';
+                if (docFiles.length > 0) {
+                    docDropZone.querySelector('p').textContent = `已选择 ${docFiles.length} 个文件`;
+                    docConvertBtn.disabled = false;
+                    docFiles.forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            const imgEl = document.createElement('img');
+                            imgEl.src = event.target.result;
+                            imgEl.className = 'w-full h-auto object-cover rounded-md shadow-sm';
+                            docPreview.appendChild(imgEl);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
+            });
+            
+            // --- 转换执行逻辑 ---
+            async function performFFmpegConversion(inputFile, outputFilename) {
+                updateProgress(0, '准备转换...', true);
+                try {
+                    await ffmpeg.writeFile(inputFile.name, await fetchFile(inputFile));
+                    await ffmpeg.exec(['-i', inputFile.name, outputFilename]);
+                    const data = await ffmpeg.readFile(outputFilename);
+                    return new Blob([data.buffer]);
+                } finally {
+                    try {
+                        await ffmpeg.deleteFile(inputFile.name);
+                        await ffmpeg.deleteFile(outputFilename);
+                    } catch(e) {}
+                }
+            }
+
+            async function handleFFmpegConvert(file, formatSelect, type) {
+                if (!file) return;
+                
+                if (!ffmpegLoaded) {
+                    const loaded = await loadFFmpeg();
+                    if (!loaded) return;
+                }
+
+                const format = formatSelect.value;
+                const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${format}`;
+                try {
+                    const blob = await performFFmpegConversion(file, outputFilename);
+                    const url = URL.createObjectURL(blob);
+                    triggerDownload(url, outputFilename);
+                    updateProgress(100, '转换成功！已开始下载。');
+                } catch (error) {
+                    console.error(`${type}转换失败:`, error);
+                    updateProgress(100, `错误：${type}转换失败。`);
+                }
+            }
+            
+            videoConvertBtn.addEventListener('click', () => handleFFmpegConvert(videoFile, videoFormatSelect, '视频'));
+            audioConvertBtn.addEventListener('click', () => handleFFmpegConvert(audioFile, audioFormatSelect, '音频'));
+            
+            imageConvertBtn.addEventListener('click', () => {
+                if (!imageFile) return;
+                updateProgress(0, '正在转换...', true);
+                const format = imageFormatSelect.value;
+                const mimeType = `image/${format}`;
+                const outputFilename = `${imageFile.name.split('.').slice(0, -1).join('.')}.${format}`;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob((blob) => {
+                            const url = URL.createObjectURL(blob);
+                            triggerDownload(url, outputFilename);
+                            updateProgress(100, '转换成功！已开始下载。');
+                        }, mimeType, 0.95);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(imageFile);
+            });
+
+            docConvertBtn.addEventListener('click', async () => {
+                if (docFiles.length === 0) return;
+                updateProgress(0, '正在生成PDF...', true);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                for (let i = 0; i < docFiles.length; i++) {
+                    const file = docFiles[i];
+                    updateProgress((i / docFiles.length) * 100, `正在处理第 ${i + 1} / ${docFiles.length} 张图片...`, true);
+                    const imgData = await readFileAsDataURL(file);
+                    const img = await loadImage(imgData);
+                    const imgProps = pdf.getImageProperties(img);
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+                    const imgWidth = imgProps.width * ratio;
+                    const imgHeight = imgProps.height * ratio;
+                    const x = (pdfWidth - imgWidth) / 2;
+                    const y = (pdfHeight - imgHeight) / 2;
+                    if (i > 0) pdf.addPage();
+                    pdf.addImage(img, 'PNG', x, y, imgWidth, imgHeight);
+                }
+                pdf.save('converted.pdf');
+                updateProgress(100, 'PDF生成成功！已开始下载。');
+            });
+            
+            function triggerDownload(url, filename) {
+                const a = document.createElement('a'); a.href = url; a.download = filename;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            function readFileAsDataURL(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result); reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+            function loadImage(src) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img); img.onerror = reject;
+                    img.src = src;
+                });
+            }
+        }
+
+        // 修正：启动带超时的初始化检查器
+        function initializeConverter(startTime = Date.now()) {
+            const TIMEOUT = 10000; // 10秒超时
+
+            if (window.FFmpeg && window.jspdf) {
+                runApp();
+                return;
+            }
+
+            if (Date.now() - startTime > TIMEOUT) {
+                console.error("核心库加载超时。");
+                const statusArea = document.getElementById('status-area');
+                const progressBar = document.getElementById('progress-bar');
+                const statusText = document.getElementById('status-text');
+                if (statusArea && statusText && progressBar) {
+                    statusArea.classList.remove('hidden');
+                    statusText.textContent = '错误：核心库加载超时，请检查网络或浏览器插件后重试。';
+                    progressBar.style.width = '100%';
+                    progressBar.classList.add('bg-red-500');
+                }
+                return;
+            }
+            
+            setTimeout(() => initializeConverter(startTime), 100);
+        }
+        
+        initializeConverter();
+    });
+    </script>
+</body>
+</html>
+
