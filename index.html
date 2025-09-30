@@ -151,13 +151,9 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         
-        // --- 核心修改：移除启动时的库加载等待，UI立即初始化 ---
-
-        // --- 懒加载库的状态管理 ---
         let ffmpegLoadPromise = null;
         let jsPDFLoadPromise = null;
 
-        // --- DOM元素获取 ---
         const statusArea = document.getElementById('status-area');
         const progressBar = document.getElementById('progress-bar');
         const statusText = document.getElementById('status-text');
@@ -185,7 +181,6 @@
         const docPreview = document.getElementById('doc-preview');
         let docFiles = [];
         
-        // --- 统一的进度更新函数 ---
         function updateProgress(percentage, message, showLoader = false) {
             statusArea.classList.remove('hidden');
             progressBar.style.width = `${percentage}%`;
@@ -203,7 +198,6 @@
             }
         }
 
-        // --- 动态脚本加载器 (带30秒超时) ---
         function loadScript(src, timeout = 30000) {
             return new Promise((resolve, reject) => {
                 if (document.querySelector(`script[src="${src}"]`)) {
@@ -229,14 +223,14 @@
             });
         }
 
-        // --- 按需获取FFmpeg实例 ---
         function getFFmpeg() {
             if (!ffmpegLoadPromise) {
                 ffmpegLoadPromise = new Promise(async (resolve, reject) => {
                     try {
                         updateProgress(0, '首次加载转换引擎 (FFmpeg)...', true);
                         if (!window.FFmpeg) {
-                            await loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js');
+                            // 关键修改：更换CDN源
+                            await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js');
                         }
                         const { FFmpeg, fetchFile } = window.FFmpeg;
                         const ffmpeg = new FFmpeg();
@@ -247,11 +241,12 @@
                                 updateProgress(percentage, `正在转换: ${percentage.toFixed(1)}%`, true);
                             }
                         });
-                        await ffmpeg.load({ coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
+                        // 关键修改：更换CDN源
+                        await ffmpeg.load({ coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
                         updateProgress(100, '引擎已就绪！');
                         resolve({ ffmpeg, fetchFile });
                     } catch (err) {
-                        ffmpegLoadPromise = null; // 失败时重置，以便下次重试
+                        ffmpegLoadPromise = null;
                         updateProgress(100, `错误：引擎加载失败。 ${err.message}`);
                         reject(err);
                     }
@@ -260,19 +255,19 @@
             return ffmpegLoadPromise;
         }
 
-        // --- 按需获取jsPDF实例 ---
         function getJsPDF() {
             if (!jsPDFLoadPromise) {
                  jsPDFLoadPromise = new Promise(async (resolve, reject) => {
                     try {
                         updateProgress(0, '首次加载PDF生成库...', true);
                         if (!window.jspdf) {
+                            // cdnjs.cloudflare.com 已经是一个很可靠的源，无需更换
                             await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
                         }
                         updateProgress(100, 'PDF库已就绪！');
                         resolve(window.jspdf.jsPDF);
                     } catch(err) {
-                        jsPDFLoadPromise = null; // 失败时重置
+                        jsPDFLoadPromise = null;
                         updateProgress(100, `错误：PDF库加载失败。 ${err.message}`);
                         reject(err);
                     }
@@ -281,7 +276,6 @@
             return jsPDFLoadPromise;
         }
 
-        // --- UI交互逻辑 ---
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const targetPanel = document.getElementById(`${tab.dataset.tab}-converter`);
@@ -308,7 +302,6 @@
             input.addEventListener('change', fileHandler);
         }
 
-        // --- 文件处理逻辑 ---
         setupDropZone(videoDropZone, videoInput, (e) => { videoFile = e.target.files[0]; if (videoFile) { videoDropZone.querySelector('p').textContent = `已选择: ${videoFile.name}`; videoConvertBtn.disabled = false; } });
         setupDropZone(audioDropZone, audioInput, (e) => { audioFile = e.target.files[0]; if (audioFile) { audioDropZone.querySelector('p').textContent = `已选择: ${audioFile.name}`; audioConvertBtn.disabled = false; } });
         setupDropZone(imageDropZone, imageInput, (e) => { imageFile = e.target.files[0]; if (imageFile) { imageDropZone.querySelector('p').textContent = `已选择: ${imageFile.name}`; imageConvertBtn.disabled = false; } });
@@ -326,7 +319,6 @@
             }
         });
         
-        // --- 转换执行逻辑 ---
         async function handleFFmpegConvert(file, formatSelect, type) {
             if (!file) return;
             try {
@@ -344,7 +336,6 @@
                 await ffmpeg.deleteFile(outputFilename);
             } catch (error) {
                 console.error(`${type}转换失败:`, error);
-                // 错误信息已在getFFmpeg中处理，这里可以只记录日志
             }
         }
         
@@ -401,11 +392,9 @@
                 updateProgress(100, 'PDF生成成功！已开始下载。');
             } catch (error) {
                  console.error("PDF生成失败:", error);
-                 // 错误信息已在getJsPDF中处理
             }
         });
         
-        // --- 辅助函数 ---
         function triggerDownload(url, filename) { const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
         function readFileAsDataURL(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
         function loadImage(src) { return new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = src; }); }
