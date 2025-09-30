@@ -240,12 +240,22 @@
 
                         // 加载 @ffmpeg/ffmpeg 和 @ffmpeg/util（0.12 系列）
                         const ffmpegUrls = [
+                            // 本地/同域静态文件（如你将库放到仓库 vendor 目录）
+                            'vendor/ffmpeg/ffmpeg.min.js',
+                            // 多CDN回退
                             'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js'
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
+                            'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
+                            'https://registry.npmmirror.com/@ffmpeg/ffmpeg/0.12.6/files/dist/ffmpeg.min.js'
                         ];
                         const utilUrls = [
+                            'vendor/ffmpeg/ffmpeg-util.min.js',
                             'https://fastly.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js'
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js',
+                            'https://unpkg.com/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js',
+                            'https://registry.npmmirror.com/@ffmpeg/util/0.12.2/files/dist/ffmpeg-util.min.js'
                         ];
 
                         let ffmpegLibLoaded = !!(window.FFmpegWASM && window.FFmpegWASM.FFmpeg);
@@ -307,8 +317,14 @@
 
                         // 只使用稳定的 jsdelivr CDN 加载核心文件（与 0.12 对齐）
                         const baseURLs = [
+                            // 本地/同域静态文件（如你将核心文件放到 vendor/core/）
+                            'vendor/core/',
+                            // 多CDN回退
                             'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/'
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
+                            'https://unpkg.com/@ffmpeg/core@0.12.6/dist/',
+                            'https://registry.npmmirror.com/@ffmpeg/core/0.12.6/files/dist/'
                         ];
 
                         let coreLoaded = false;
