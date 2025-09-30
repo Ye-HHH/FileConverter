@@ -253,23 +253,21 @@
                         });
                         
                         updateProgress(25, '正在下载核心组件...', true);
-                        // 终极修复：使用 @ffmpeg/core-mt 来确保 worker 存在
-                        const primaryBaseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd/';
+                        // CORS修复：使用单线程版本避免Worker跨域问题
+                        const primaryBaseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/';
 
-                        // 终极修复：现在加载多线程版本需要的三个文件
-                        const [coreURL, wasmURL, workerURL] = await Promise.all([
+                        // 使用单线程版本，只需要两个文件
+                        const [coreURL, wasmURL] = await Promise.all([
                             fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.js'),
-                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.wasm'),
-                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.worker.js') // 关键修复：加载 worker 脚本
+                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.wasm')
                         ]);
                         updateProgress(50, '核心组件下载完毕，正在初始化引擎...', true);
-                        
-                        // 终极修复：现在传入 workerURL
-                        await ffmpeg.load({ coreURL, wasmURL, workerURL });
+
+                        // 使用单线程版本加载
+                        await ffmpeg.load({ coreURL, wasmURL });
 
                         URL.revokeObjectURL(coreURL);
                         URL.revokeObjectURL(wasmURL);
-                        URL.revokeObjectURL(workerURL);
 
                         updateProgress(100, '引擎已就绪！');
                         resolve({ ffmpeg, fetchFile });
