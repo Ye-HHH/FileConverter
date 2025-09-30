@@ -198,6 +198,21 @@
             }
         }
 
+        async function loadScriptWithFallback(primarySrc, fallbackSrc, timeout = 30000) {
+            try {
+                await loadScript(primarySrc, timeout);
+            } catch (error) {
+                console.warn(`Primary script load failed: ${primarySrc}. Attempting fallback...`);
+                updateProgress(10, '主线路加载失败，正在尝试备用线路...', true);
+                try {
+                    await loadScript(fallbackSrc, timeout);
+                } catch (fallbackError) {
+                    console.error(`Fallback script load failed: ${fallbackSrc}.`);
+                    throw fallbackError;
+                }
+            }
+        }
+        
         function loadScript(src, timeout = 30000) {
             return new Promise((resolve, reject) => {
                 if (document.querySelector(`script[src="${src}"]`)) {
@@ -222,27 +237,66 @@
                 document.head.appendChild(script);
             });
         }
+        
+        // 终极修复part 1：创建Blob URL的辅助函数
+        async function fetchAndCreateBlobUrl(primaryUrl, fallbackUrl) {
+            let response;
+            try {
+                response = await fetch(primaryUrl);
+                if (!response.ok) throw new Error('Primary fetch failed');
+            } catch (e) {
+                console.warn('Primary URL failed, trying fallback:', primaryUrl);
+                updateProgress(30, '组件主线路下载失败，切换备用线路...', true);
+                response = await fetch(fallbackUrl);
+                if (!response.ok) throw new Error('Fallback fetch also failed');
+            }
+            const data = await response.blob();
+            return URL.createObjectURL(data);
+        }
+
 
         function getFFmpeg() {
             if (!ffmpegLoadPromise) {
                 ffmpegLoadPromise = new Promise(async (resolve, reject) => {
                     try {
-                        updateProgress(0, '首次加载转换引擎 (FFmpeg)...', true);
-                        if (!window.FFmpeg) {
-                            // 关键修改：更换CDN源
-                            await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js');
+                        updateProgress(0, '加载引擎主程序...', true);
+                        if (!window.FFmpegWASM) {
+                            const primarySrc = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js';
+                            const fallbackSrc = 'https://cdn.statically.io/npm/@ffmpeg/ffmpeg/0.12.6/dist/umd/ffmpeg.min.js';
+                            await loadScriptWithFallback(primarySrc, fallbackSrc);
                         }
-                        const { FFmpeg, fetchFile } = window.FFmpeg;
+                        updateProgress(20, '引擎主程序加载完毕...', true);
+
+                        const { FFmpeg, fetchFile } = window.FFmpegWASM;
                         const ffmpeg = new FFmpeg();
                         ffmpeg.on('log', ({ message }) => console.log(message));
                         ffmpeg.on('progress', ({ progress }) => {
                             if (progress >= 0 && progress <= 1) {
-                                const percentage = progress * 100;
-                                updateProgress(percentage, `正在转换: ${percentage.toFixed(1)}%`, true);
+                                // 将进度条的60%-100%分配给转换过程
+                                const overallProgress = 60 + (progress * 40);
+                                updateProgress(overallProgress, `正在转换: ${(progress * 100).toFixed(1)}%`, true);
                             }
                         });
-                        // 关键修改：更换CDN源
-                        await ffmpeg.load({ coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
+                        
+                        // 终极修复part 2：并行下载所有核心文件并创建Blob URL
+                        updateProgress(25, '正在下载核心组件...', true);
+                        const primaryBaseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/';
+                        const fallbackBaseUrl = 'https://cdn.statically.io/npm/@ffmpeg/core/0.12.6/dist/umd/';
+
+                        const [coreURL, wasmURL, workerURL] = await Promise.all([
+                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.js', fallbackBaseUrl + 'ffmpeg-core.js'),
+                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.wasm', fallbackBaseUrl + 'ffmpeg-core.wasm'),
+                            fetchAndCreateBlobUrl(primaryBaseUrl + 'ffmpeg-core.worker.js', fallbackBaseUrl + 'ffmpeg-core.worker.js')
+                        ]);
+                        updateProgress(50, '核心组件下载完毕，正在初始化引擎...', true);
+                        
+                        await ffmpeg.load({ coreURL, wasmURL, workerURL });
+
+                        // 释放内存
+                        URL.revokeObjectURL(coreURL);
+                        URL.revokeObjectURL(wasmURL);
+                        URL.revokeObjectURL(workerURL);
+
                         updateProgress(100, '引擎已就绪！');
                         resolve({ ffmpeg, fetchFile });
                     } catch (err) {
@@ -261,8 +315,9 @@
                     try {
                         updateProgress(0, '首次加载PDF生成库...', true);
                         if (!window.jspdf) {
-                            // cdnjs.cloudflare.com 已经是一个很可靠的源，无需更换
-                            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+                            const primarySrc = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                            const fallbackSrc = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+                            await loadScriptWithFallback(primarySrc, fallbackSrc);
                         }
                         updateProgress(100, 'PDF库已就绪！');
                         resolve(window.jspdf.jsPDF);
@@ -323,7 +378,7 @@
             if (!file) return;
             try {
                 const { ffmpeg, fetchFile } = await getFFmpeg();
-                updateProgress(0, '准备转换...', true);
+                updateProgress(60, '准备转换...', true); // Starting point after load
                 const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${formatSelect.value}`;
                 await ffmpeg.writeFile(file.name, await fetchFile(file));
                 await ffmpeg.exec(['-i', file.name, outputFilename]);
@@ -336,6 +391,7 @@
                 await ffmpeg.deleteFile(outputFilename);
             } catch (error) {
                 console.error(`${type}转换失败:`, error);
+                updateProgress(100, `错误：${type}转换失败。`);
             }
         }
         
@@ -392,6 +448,7 @@
                 updateProgress(100, 'PDF生成成功！已开始下载。');
             } catch (error) {
                  console.error("PDF生成失败:", error);
+                 updateProgress(100, `错误：PDF生成失败。`);
             }
         });
         
