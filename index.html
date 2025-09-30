@@ -415,12 +415,26 @@
                 let args = ['-i', file.name];
                 // 对 M4V 使用“重封装”（不重新编码），大幅提高成功率
                 if (type === '视频' && formatSelect.value === 'm4v') {
-                    args.push('-c', 'copy', '-map', '0', '-movflags', 'faststart', '-f', 'mp4', outputFilename);
+                    try {
+                        args.push('-c', 'copy', '-map', '0', '-movflags', 'faststart', '-f', 'mp4', outputFilename);
+                        await ffmpeg.exec(args);
+                    } catch (e) {
+                        // 若重封装失败（例如输入编码不被MP4容器接受），回退到重新编码
+                        console.warn('M4V copy 重封装失败，尝试重新编码:', e?.message || e);
+                        updateProgress(70, '重封装失败，尝试重新编码...', true);
+                        await ffmpeg.exec([
+                            '-i', file.name,
+                            '-c:v', 'libx264', '-preset', 'veryfast',
+                            '-c:a', 'aac', '-b:a', '128k',
+                            '-movflags', 'faststart', '-f', 'mp4',
+                            outputFilename
+                        ]);
+                    }
                 } else {
                     // 默认策略：让 ffmpeg 根据后缀决定容器/编码
                     args.push(outputFilename);
+                    await ffmpeg.exec(args);
                 }
-                await ffmpeg.exec(args);
 
                 const data = await ffmpeg.readFile(outputFilename);
                 const blob = new Blob([data.buffer]);
