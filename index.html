@@ -237,10 +237,26 @@
                     try {
                         updateProgress(0, '加载引擎主程序...', true);
 
-                        // 回到原始的jsdelivr CDN，但使用正确路径
+                        // 使用多个CDN备选方案，优先国内可访问的
                         if (!window.FFmpegWASM) {
-                            const primarySrc = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js';
-                            await loadScript(primarySrc);
+                            const cdnUrls = [
+                                'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js',
+                                'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js',
+                                'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js'
+                            ];
+
+                            let loaded = false;
+                            for (const url of cdnUrls) {
+                                try {
+                                    await loadScript(url);
+                                    loaded = true;
+                                    console.log(`FFmpeg loaded from: ${url}`);
+                                    break;
+                                } catch (err) {
+                                    console.warn(`Failed to load from ${url}:`, err.message);
+                                }
+                            }
+                            if (!loaded) throw new Error('所有CDN都无法访问FFmpeg库');
                         }
                         updateProgress(20, '引擎主程序加载完毕...', true);
 
@@ -257,13 +273,28 @@
 
                         updateProgress(25, '正在下载核心组件...', true);
 
-                        // 使用jsdelivr CDN加载核心文件
-                        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/';
+                        // 使用多个CDN备选方案加载核心文件
+                        const baseURLs = [
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/',
+                            'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/'
+                        ];
 
-                        await ffmpeg.load({
-                            coreURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.js'),
-                            wasmURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.wasm')
-                        });
+                        let coreLoaded = false;
+                        for (const baseURL of baseURLs) {
+                            try {
+                                await ffmpeg.load({
+                                    coreURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.js'),
+                                    wasmURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.wasm')
+                                });
+                                console.log(`FFmpeg core loaded from: ${baseURL}`);
+                                coreLoaded = true;
+                                break;
+                            } catch (err) {
+                                console.warn(`Failed to load core from ${baseURL}:`, err.message);
+                            }
+                        }
+                        if (!coreLoaded) throw new Error('所有CDN都无法访问FFmpeg核心文件');
 
                         updateProgress(100, '引擎已就绪！');
                         resolve({ ffmpeg, fetchFile });
