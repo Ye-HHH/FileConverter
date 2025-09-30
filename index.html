@@ -237,12 +237,11 @@
                     try {
                         updateProgress(0, '加载引擎主程序...', true);
 
-                        // 使用多个CDN备选方案，使用已知可用的版本
+                        // 只使用稳定的jsdelivr CDN
                         if (!window.FFmpegWASM) {
                             const cdnUrls = [
                                 'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js',
-                                'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js',
-                                'https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js'
+                                'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js'
                             ];
 
                             let loaded = false;
@@ -273,11 +272,10 @@
 
                         updateProgress(25, '正在下载核心组件...', true);
 
-                        // 使用多个CDN备选方案加载核心文件，使用0.11版本
+                        // 只使用稳定的jsdelivr CDN加载核心文件
                         const baseURLs = [
                             'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/',
-                            'https://unpkg.com/@ffmpeg/core@0.11.0/dist/'
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/'
                         ];
 
                         let coreLoaded = false;
