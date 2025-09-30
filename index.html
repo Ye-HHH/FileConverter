@@ -238,43 +238,61 @@
                     try {
                         updateProgress(0, '加载引擎主程序...', true);
 
-                        // 只使用稳定的jsdelivr CDN
-                        if (!window.FFmpegWASM) {
-                            const cdnUrls = [
-                                'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js',
-                                'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js'
-                            ];
+                        // 加载 @ffmpeg/ffmpeg 和 @ffmpeg/util（0.12 系列）
+                        const ffmpegUrls = [
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js'
+                        ];
+                        const utilUrls = [
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/ffmpeg-util.min.js'
+                        ];
 
-                            let loaded = false;
-                            for (const url of cdnUrls) {
+                        let ffmpegLibLoaded = !!(window.FFmpegWASM && window.FFmpegWASM.FFmpeg);
+                        if (!ffmpegLibLoaded) {
+                            for (const url of ffmpegUrls) {
                                 try {
                                     await loadScript(url);
-                                    loaded = true;
+                                    ffmpegLibLoaded = true;
                                     console.log(`FFmpeg loaded from: ${url}`);
                                     break;
                                 } catch (err) {
                                     console.warn(`Failed to load from ${url}:`, err.message);
                                 }
                             }
-                            if (!loaded) throw new Error('所有CDN都无法访问FFmpeg库');
+                        }
+                        if (!ffmpegLibLoaded) throw new Error('所有CDN都无法访问 @ffmpeg/ffmpeg 库');
+
+                        // 加载 util 以提供 fetchFile（0.12 起从 @ffmpeg/util 提供）
+                        let utilLoaded = !!(window.FFmpegUtil && window.FFmpegUtil.fetchFile);
+                        if (!utilLoaded) {
+                            for (const url of utilUrls) {
+                                try {
+                                    await loadScript(url);
+                                    utilLoaded = !!(window.FFmpegUtil && window.FFmpegUtil.fetchFile);
+                                    if (utilLoaded) {
+                                        console.log(`FFmpeg util loaded from: ${url}`);
+                                        break;
+                                    }
+                                } catch (err) {
+                                    console.warn(`Failed to load util from ${url}:`, err.message);
+                                }
+                            }
                         }
                         updateProgress(20, '引擎主程序加载完毕...', true);
 
-                        // 检查FFmpegWASM对象结构并适配不同版本
-                        console.log('FFmpegWASM object:', window.FFmpegWASM);
-                        let FFmpegClass, fetchFile;
+                        // 适配对象引用
+                        const FFmpegClass = window.FFmpegWASM && window.FFmpegWASM.FFmpeg;
+                        const fetchFile = (window.FFmpegUtil && window.FFmpegUtil.fetchFile) || (window.FFmpegWASM && window.FFmpegWASM.fetchFile);
 
-                        if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
-                            FFmpegClass = window.FFmpegWASM.FFmpeg;
-                            fetchFile = window.FFmpegWASM.fetchFile;
-                        } else if (window.FFmpeg) {
-                            FFmpegClass = window.FFmpeg;
-                            fetchFile = window.fetchFile;
-                        } else {
-                            throw new Error('FFmpeg库加载失败，无法找到FFmpeg对象');
+                        if (typeof FFmpegClass !== 'function') {
+                            throw new Error(`FFmpeg不是构造函数，类型为: ${typeof FFmpegClass}`);
+                        }
+                        if (typeof fetchFile !== 'function') {
+                            throw new Error('未找到 fetchFile（请检查 @ffmpeg/util 是否加载成功）');
                         }
 
-                        // 使用正确的构造函数
+                        // 创建FFmpeg实例
                         const ffmpeg = new FFmpegClass();
 
                         ffmpeg.on('log', ({ message }) => console.log(message));
@@ -287,18 +305,19 @@
 
                         updateProgress(25, '正在下载核心组件...', true);
 
-                        // 只使用稳定的jsdelivr CDN加载核心文件
+                        // 只使用稳定的 jsdelivr CDN 加载核心文件（与 0.12 对齐）
                         const baseURLs = [
-                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/'
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/'
                         ];
 
                         let coreLoaded = false;
                         for (const baseURL of baseURLs) {
                             try {
                                 await ffmpeg.load({
-                                    coreURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.js'),
-                                    wasmURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.wasm')
+                                    coreURL: baseURL + 'ffmpeg-core.js',
+                                    wasmURL: baseURL + 'ffmpeg-core.wasm',
+                                    workerURL: baseURL + 'ffmpeg-core.worker.js'
                                 });
                                 console.log(`FFmpeg core loaded from: ${baseURL}`);
                                 coreLoaded = true;
@@ -361,8 +380,8 @@
                 e.preventDefault();
                 dropZone.classList.remove('drag-over');
                 if (e.dataTransfer.files.length) {
-                    input.files = e.dataTransfer.files;
-                    fileHandler({ target: input });
+                    // 直接将 files 作为事件目标传入，避免直接写入只读的 input.files
+                    fileHandler({ target: { files: e.dataTransfer.files } });
                 }
             });
             input.addEventListener('change', fileHandler);
@@ -474,4 +493,3 @@
     </script>
 </body>
 </html>
-
