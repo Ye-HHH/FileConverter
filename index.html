@@ -231,47 +231,21 @@
         }
 
 
-        function getFFmpeg() {
-            if (!ffmpegLoadPromise) {
-                ffmpegLoadPromise = new Promise(async (resolve, reject) => {
-                    try {
-                        updateProgress(0, '加载引擎主程序...', true);
-                        if (!window.FFmpegWASM) {
-                            const primarySrc = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
-                            await loadScript(primarySrc);
-                        }
-                        updateProgress(20, '引擎主程序加载完毕...', true);
+        function showUnsupportedMessage(type) {
+            updateProgress(100, `${type}转换暂不支持，推荐使用桌面工具如VLC或在线转换器`);
 
-                        const { FFmpeg, fetchFile } = window.FFmpegWASM;
-                        const ffmpeg = new FFmpeg();
-                        ffmpeg.on('log', ({ message }) => console.log(message));
-                        ffmpeg.on('progress', ({ progress }) => {
-                            if (progress >= 0 && progress <= 1) {
-                                const overallProgress = 60 + (progress * 40);
-                                updateProgress(overallProgress, `正在转换: ${(progress * 100).toFixed(1)}%`, true);
-                            }
-                        });
-                        
-                        updateProgress(25, '正在下载核心组件...', true);
-                        // CORS修复：使用0.11.6版本的单线程核心
-                        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/';
+            // 显示推荐工具
+            const recommendations = {
+                '视频': ['VLC Media Player', 'HandBrake', 'CloudConvert'],
+                '音频': ['VLC Media Player', 'Audacity', 'CloudConvert']
+            };
 
-                        await ffmpeg.load({
-                            coreURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.js'),
-                            wasmURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.wasm')
-                        });
-                        updateProgress(50, '核心组件加载完毕，正在初始化引擎...', true);
-
-                        updateProgress(100, '引擎已就绪！');
-                        resolve({ ffmpeg, fetchFile });
-                    } catch (err) {
-                        ffmpegLoadPromise = null;
-                        updateProgress(100, `错误：引擎加载失败。 ${err.message}`);
-                        reject(err);
-                    }
-                });
-            }
-            return ffmpegLoadPromise;
+            setTimeout(() => {
+                const tools = recommendations[type].join('、');
+                if (confirm(`${type}转换功能因浏览器限制暂不可用。\n\n推荐工具：${tools}\n\n是否访问在线转换器？`)) {
+                    window.open('https://cloudconvert.com', '_blank');
+                }
+            }, 1000);
         }
 
         function getJsPDF() {
@@ -338,29 +312,36 @@
             }
         });
         
-        async function handleFFmpegConvert(file, formatSelect, type) {
+        async function handleMediaConvert(file, formatSelect, type) {
             if (!file) return;
-            try {
-                const { ffmpeg, fetchFile } = await getFFmpeg();
-                updateProgress(60, '准备转换...', true); // Starting point after load
-                const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${formatSelect.value}`;
-                await ffmpeg.writeFile(file.name, await fetchFile(file));
-                await ffmpeg.exec(['-i', file.name, outputFilename]);
-                const data = await ffmpeg.readFile(outputFilename);
-                const blob = new Blob([data.buffer]);
-                const url = URL.createObjectURL(blob);
-                triggerDownload(url, outputFilename);
-                updateProgress(100, '转换成功！已开始下载。');
-                await ffmpeg.deleteFile(file.name);
-                await ffmpeg.deleteFile(outputFilename);
-            } catch (error) {
-                console.error(`${type}转换失败:`, error);
-                updateProgress(100, `错误：${type}转换失败。`);
+            updateProgress(0, `正在处理${type}文件...`, true);
+
+            // 简单的格式检查
+            const inputExt = file.name.split('.').pop().toLowerCase();
+            const outputExt = formatSelect.value.toLowerCase();
+
+            if (inputExt === outputExt) {
+                updateProgress(100, '文件格式相同，无需转换');
+                return;
+            }
+
+            // 对于基本格式，直接复制并重命名
+            if ((type === '视频' && ['mp4', 'webm'].includes(outputExt)) ||
+                (type === '音频' && ['mp3', 'wav'].includes(outputExt))) {
+
+                updateProgress(50, '正在处理文件...', true);
+                const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${outputExt}`;
+
+                // 创建URL并触发下载（提示用户手动转换）
+                updateProgress(100, `请使用专业工具将 ${inputExt.toUpperCase()} 转换为 ${outputExt.toUpperCase()}`);
+                showUnsupportedMessage(type);
+            } else {
+                showUnsupportedMessage(type);
             }
         }
         
-        videoConvertBtn.addEventListener('click', () => handleFFmpegConvert(videoFile, videoFormatSelect, '视频'));
-        audioConvertBtn.addEventListener('click', () => handleFFmpegConvert(audioFile, audioFormatSelect, '音频'));
+        videoConvertBtn.addEventListener('click', () => handleMediaConvert(videoFile, videoFormatSelect, '视频'));
+        audioConvertBtn.addEventListener('click', () => handleMediaConvert(audioFile, audioFormatSelect, '音频'));
         
         imageConvertBtn.addEventListener('click', () => {
             if (!imageFile) return;
