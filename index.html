@@ -259,7 +259,20 @@
                         }
                         updateProgress(20, '引擎主程序加载完毕...', true);
 
-                        const { FFmpeg, fetchFile } = window.FFmpegWASM;
+                        // 检查FFmpegWASM对象结构并适配不同版本
+                        console.log('FFmpegWASM object:', window.FFmpegWASM);
+                        let FFmpeg, fetchFile;
+
+                        if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
+                            FFmpeg = window.FFmpegWASM.FFmpeg;
+                            fetchFile = window.FFmpegWASM.fetchFile;
+                        } else if (window.FFmpeg) {
+                            FFmpeg = window.FFmpeg;
+                            fetchFile = window.fetchFile;
+                        } else {
+                            throw new Error('FFmpeg库加载失败，无法找到FFmpeg对象');
+                        }
+
                         const ffmpeg = new FFmpeg({ log: true });
 
                         ffmpeg.on('log', ({ message }) => console.log(message));
