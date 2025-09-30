@@ -237,9 +237,9 @@
                     try {
                         updateProgress(0, '加载引擎主程序...', true);
 
-                        // 尝试使用unpkg CDN替代jsdelivr
+                        // 回到原始的jsdelivr CDN，但使用正确路径
                         if (!window.FFmpegWASM) {
-                            const primarySrc = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js';
+                            const primarySrc = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js';
                             await loadScript(primarySrc);
                         }
                         updateProgress(20, '引擎主程序加载完毕...', true);
@@ -257,8 +257,8 @@
 
                         updateProgress(25, '正在下载核心组件...', true);
 
-                        // 尝试使用unpkg作为备用CDN
-                        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/';
+                        // 使用jsdelivr CDN加载核心文件
+                        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/';
 
                         await ffmpeg.load({
                             coreURL: await fetchAndCreateBlobUrl(baseURL + 'ffmpeg-core.js'),
