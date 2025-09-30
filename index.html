@@ -261,20 +261,20 @@
 
                         // 检查FFmpegWASM对象结构并适配不同版本
                         console.log('FFmpegWASM object:', window.FFmpegWASM);
-                        let FFmpeg, fetchFile;
+                        let FFmpegClass, fetchFile;
 
                         if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
-                            FFmpeg = window.FFmpegWASM.FFmpeg;
+                            FFmpegClass = window.FFmpegWASM.FFmpeg;
                             fetchFile = window.FFmpegWASM.fetchFile;
                         } else if (window.FFmpeg) {
-                            FFmpeg = window.FFmpeg;
+                            FFmpegClass = window.FFmpeg;
                             fetchFile = window.fetchFile;
                         } else {
                             throw new Error('FFmpeg库加载失败，无法找到FFmpeg对象');
                         }
 
-                        // 适配FFmpeg 0.11.6版本的构造函数语法
-                        const ffmpeg = new FFmpeg();
+                        // 使用正确的构造函数
+                        const ffmpeg = new FFmpegClass();
 
                         ffmpeg.on('log', ({ message }) => console.log(message));
                         ffmpeg.on('progress', ({ progress }) => {
