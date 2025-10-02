@@ -54,6 +54,7 @@
             <button data-tab="audio" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">音频转换</button>
             <button data-tab="image" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">图片转换</button>
             <button data-tab="document" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">图片转PDF</button>
+            <button data-tab="selftest" class="tab-button text-sm md:text-base font-medium py-3 px-4 md:px-6 border-b-2 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition">自检</button>
         </div>
 
         <!-- 转换器内容区域 -->
@@ -78,6 +79,14 @@
                 </div>
                 <div class="text-center mt-6">
                     <button id="video-convert-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>开始转换</button>
+                </div>
+
+                <!-- 一键M4V转换区 -->
+                <div class="mt-8 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-center">
+                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">自动将当前目录下的 <code>test_input.mp4</code> 转为 <code>.m4v</code>。</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">建议用本地服务器打开此页，并准备 <code>test_input.mp4</code> 于同目录。保存时将提示选择“输出”目录。</p>
+                    <button id="auto-m4v-btn" class="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition">一键M4V转换</button>
+                    <p id="auto-m4v-hint" class="mt-2 text-xs text-amber-600 dark:text-amber-400"></p>
                 </div>
             </div>
 
@@ -135,6 +144,33 @@
                     <button id="doc-convert-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>合并为PDF</button>
                 </div>
             </div>
+
+            <!-- 自检面板 -->
+            <div id="selftest-converter" class="converter-panel hidden">
+                <p class="text-center text-gray-600 dark:text-gray-400 mb-4">选择本地视频批量转换为多种格式并保存到选定目录，自动验证与报告。</p>
+                <div class="drop-zone rounded-lg p-8 text-center cursor-pointer" id="selftest-drop-zone">
+                    <p class="text-gray-500">拖拽视频文件至此，或 <span class="text-blue-500 font-semibold">点击选择</span></p>
+                    <input type="file" id="selftest-input" class="hidden" accept="video/*">
+                </div>
+                <div class="mt-4">
+                    <label class="mr-2 font-medium">目标格式:</label>
+                    <div class="grid grid-cols-3 gap-2 text-sm">
+                        <label><input type="checkbox" class="selftest-format" value="mp4" checked> mp4</label>
+                        <label><input type="checkbox" class="selftest-format" value="m4v" checked> m4v</label>
+                        <label><input type="checkbox" class="selftest-format" value="webm" checked> webm</label>
+                        <label><input type="checkbox" class="selftest-format" value="avi"> avi</label>
+                        <label><input type="checkbox" class="selftest-format" value="mov"> mov</label>
+                        <label><input type="checkbox" class="selftest-format" value="gif"> gif</label>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center gap-3 flex-wrap">
+                    <button id="selftest-choose-dir" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded hover:bg-gray-700">选择输出目录</button>
+                    <span id="selftest-dir-label" class="text-sm text-gray-600 dark:text-gray-400"></span>
+                </div>
+                <div class="text-center mt-6">
+                    <button id="selftest-run" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>开始自检</button>
+                </div>
+            </div>
             
             <!-- 通用状态和进度条显示区域 -->
             <div id="status-area" class="mt-6 text-center space-y-3 hidden">
@@ -181,6 +217,19 @@
         const docConvertBtn = document.getElementById('doc-convert-btn');
         const docPreview = document.getElementById('doc-preview');
         let docFiles = [];
+        
+        // 自检：是否可直接访问 test_input.mp4（用于引导提示）
+        (async () => {
+            try {
+                const res = await fetch('test_input.mp4', { method: 'HEAD', cache: 'no-store' });
+                if (res && (res.ok || res.status === 304)) {
+                    const hint = document.getElementById('auto-m4v-hint');
+                    if (hint) hint.textContent = '已检测到 test_input.mp4，可直接一键转换。';
+                }
+            } catch (err) {
+                // 忽略网络探测失败
+            }
+        })();
         
         function updateProgress(percentage, message, showLoader = false) {
             statusArea.classList.remove('hidden');
@@ -243,11 +292,10 @@
                             // 本地/同域静态文件（如你将库放到仓库 vendor 目录）
                             'vendor/ffmpeg/ffmpeg.min.js',
                             // 多CDN回退
-                            'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
-                            'https://gcore.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
-                            'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js',
-                            'https://registry.npmmirror.com/@ffmpeg/ffmpeg/0.12.6/files/dist/ffmpeg.min.js'
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js',
+                            'https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js'
                         ];
                         const utilUrls = [
                             'vendor/ffmpeg/ffmpeg-util.min.js',
@@ -293,13 +341,41 @@
 
                         // 适配对象引用（兼容 UMD 全局与旧命名）
                         const FFmpegClass = (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) || window.FFmpeg;
-                        const fetchFile = (window.FFmpegUtil && window.FFmpegUtil.fetchFile) || (window.FFmpegWASM && window.FFmpegWASM.fetchFile) || window.fetchFile;
+                        let fetchFile = (window.FFmpegUtil && window.FFmpegUtil.fetchFile) || (window.FFmpegWASM && window.FFmpegWASM.fetchFile) || window.fetchFile;
 
                         if (typeof FFmpegClass !== 'function') {
                             throw new Error(`FFmpeg不是构造函数，类型为: ${typeof FFmpegClass}`);
                         }
+
+                        // 本地回退：当 @ffmpeg/util 未能成功挂载时，提供一个等价的 fetchFile
                         if (typeof fetchFile !== 'function') {
-                            throw new Error('未找到 fetchFile（请检查 @ffmpeg/util 是否加载成功）');
+                            console.warn('未检测到 @ffmpeg/util 的 fetchFile，使用本地回退实现');
+                            fetchFile = async (input) => {
+                                try {
+                                    if (typeof input === 'string' || input instanceof URL) {
+                                        const res = await fetch(String(input));
+                                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                        const buf = await res.arrayBuffer();
+                                        return new Uint8Array(buf);
+                                    }
+                                    if (input instanceof Blob) {
+                                        // File 也是 Blob 的子类
+                                        const buf = await input.arrayBuffer();
+                                        return new Uint8Array(buf);
+                                    }
+                                    if (input instanceof ArrayBuffer) {
+                                        return new Uint8Array(input);
+                                    }
+                                    if (input instanceof Uint8Array) {
+                                        return input;
+                                    }
+                                    console.warn('fetchFile 回退收到未知输入类型，返回空数据');
+                                    return new Uint8Array();
+                                } catch (e) {
+                                    console.error('fetchFile 回退实现失败:', e);
+                                    throw e;
+                                }
+                            };
                         }
 
                         // 创建FFmpeg实例
@@ -316,16 +392,32 @@
                         updateProgress(25, '正在下载核心组件...', true);
 
                         // 只使用稳定的 jsdelivr CDN 加载核心文件（与 0.12 对齐）
-                        const baseURLs = [
-                            // 本地/同域静态文件（如你将核心文件放到 vendor/core/）
-                            'vendor/core/',
-                            // 多CDN回退
-                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
-                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
-                            'https://gcore.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/',
-                            'https://unpkg.com/@ffmpeg/core@0.12.6/dist/',
-                            'https://registry.npmmirror.com/@ffmpeg/core/0.12.6/files/dist/'
+                        // 根据是否跨源隔离选择核心构建（GitHub Pages、本地静态服务通常不具备 COOP/COEP）
+                        const isCOI = window.crossOriginIsolated === true;
+                        if (!isCOI) console.warn('跨源隔离未启用，将优先尝试单线程核心');
+
+                        // 多线程核心（更快，需 COOP/COEP）。包名通常为 @ffmpeg/core-mt，从 @ffmpeg/core 也可能提供。
+                        const mtCDNs = [
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.15/dist/',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.15/dist/',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.15/dist/',
+                            'https://unpkg.com/@ffmpeg/core-mt@0.12.15/dist/',
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/',
+                            'https://unpkg.com/@ffmpeg/core@0.12.15/dist/'
                         ];
+                        // 单线程核心（兼容无 COOP/COEP）。包名通常为 @ffmpeg/core。
+                        const stCDNs = [
+                            'https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/',
+                            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/',
+                            'https://gcore.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/',
+                            'https://unpkg.com/@ffmpeg/core@0.12.15/dist/'
+                        ];
+                        // 组合候选顺序：本地 -> ST 或 MT -> 另一种
+                        const baseURLs = isCOI
+                          ? ['vendor/core/', ...mtCDNs, ...stCDNs]
+                          : ['vendor/core-st/', 'vendor/core/', ...stCDNs, ...mtCDNs];
 
                         let coreLoaded = false;
                         for (const baseURL of baseURLs) {
@@ -362,8 +454,17 @@
                     try {
                         updateProgress(0, '首次加载PDF生成库...', true);
                         if (!window.jspdf) {
-                            const primarySrc = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-                            await loadScript(primarySrc);
+                            const jsPdfUrls = [
+                                'vendor/jspdf/jspdf.umd.min.js',
+                                'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                                'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
+                                'https://fastly.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+                            ];
+                            let loaded = false;
+                            for (const src of jsPdfUrls) {
+                                try { await loadScript(src); loaded = true; console.log('jsPDF loaded from:', src); break; } catch(e) { console.warn('jsPDF load failed:', src, e?.message||e); }
+                            }
+                            if (!loaded) throw new Error('无法加载 jsPDF');
                         }
                         updateProgress(100, 'PDF库已就绪！');
                         resolve(window.jspdf.jsPDF);
@@ -375,6 +476,172 @@
                  });
             }
             return jsPDFLoadPromise;
+        }
+
+        async function pickOutputDirectoryAndSave(filename, blob) {
+            try {
+                if (!window.showDirectoryPicker) throw new Error('浏览器不支持目录保存');
+                const baseDir = await window.showDirectoryPicker();
+                // 优先使用“输出”子目录
+                let outDir = baseDir;
+                try { outDir = await baseDir.getDirectoryHandle('输出', { create: true }); } catch (e) {}
+                const fileHandle = await outDir.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                return true;
+            } catch (e) {
+                console.warn('目录保存失败，回退为下载:', e?.message || e);
+                return false;
+            }
+        }
+
+        async function autoConvertToM4V() {
+            try {
+                updateProgress(0, '准备自动转换...', true);
+                const { ffmpeg, fetchFile } = await getFFmpeg();
+
+                const inputName = 'test_input.mp4';
+                const outputName = 'test_input.m4v';
+
+                updateProgress(20, '读取源文件...', true);
+                const inputBytes = await fetchFile(inputName);
+                if (!inputBytes || inputBytes.length === 0) throw new Error('无法读取 test_input.mp4');
+                await ffmpeg.writeFile(inputName, inputBytes);
+
+                const attempts = [
+                    { name: '无损重封装', args: ['-i', inputName, '-c', 'copy', '-map', '0', '-movflags', 'faststart', '-f', 'mp4', outputName] },
+                    { name: '复制视频+重编码音频(AAC)', args: ['-i', inputName, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', '-f', 'mp4', outputName] },
+                    { name: 'H.264 + AAC 重新编码', args: ['-i', inputName, '-c:v', 'libx264', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', '-f', 'mp4', outputName] },
+                    { name: 'MPEG4 + AAC 兜底编码', args: ['-i', inputName, '-c:v', 'mpeg4', '-qscale:v', '2', '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', '-f', 'mp4', outputName] }
+                ];
+
+                let success = false; let lastErr = null;
+                for (let i = 0; i < attempts.length; i++) {
+                    const step = attempts[i];
+                    updateProgress(40, `尝试(${i + 1}/${attempts.length})：${step.name}...`, true);
+                    try {
+                        await ffmpeg.exec(step.args);
+                        success = true;
+                        break;
+                    } catch (e) {
+                        lastErr = e;
+                        console.warn(`方案失败: ${step.name}`, e?.message || e);
+                    }
+                }
+
+                if (!success) throw new Error(`所有策略失败：${lastErr?.message || lastErr}`);
+
+                updateProgress(80, '导出并保存...', true);
+                const data = await ffmpeg.readFile(outputName);
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+                const saved = await pickOutputDirectoryAndSave(outputName, blob);
+                if (!saved) {
+                    const url = URL.createObjectURL(blob);
+                    triggerDownload(url, outputName);
+                }
+
+                updateProgress(100, '转换成功！文件已保存/下载。');
+
+                await ffmpeg.deleteFile(inputName).catch(()=>{});
+                await ffmpeg.deleteFile(outputName).catch(()=>{});
+            } catch (error) {
+                console.error('自动M4V转换失败:', error);
+                updateProgress(100, `错误：自动转换失败。${error?.message || error}`);
+            }
+        }
+
+        function buildVideoAttempts(targetExt, inputName, outputName) {
+            const A = [];
+            switch (targetExt) {
+                case 'mp4':
+                    A.push(
+                        { name: '无损重封装', args: ['-i', inputName, '-c', 'copy', '-movflags', 'faststart', outputName] },
+                        { name: 'H.264 + AAC', args: ['-i', inputName, '-c:v', 'libx264', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', outputName] },
+                        { name: 'MPEG4 + AAC', args: ['-i', inputName, '-c:v', 'mpeg4', '-qscale:v', '2', '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', outputName] }
+                    );
+                    break;
+                case 'm4v':
+                    A.push(
+                        { name: '无损重封装', args: ['-i', inputName, '-c', 'copy', '-map', '0', '-movflags', 'faststart', '-f', 'mp4', outputName] },
+                        { name: 'H.264 + AAC', args: ['-i', inputName, '-c:v', 'libx264', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', '-f', 'mp4', outputName] },
+                        { name: 'MPEG4 + AAC', args: ['-i', inputName, '-c:v', 'mpeg4', '-qscale:v', '2', '-c:a', 'aac', '-b:a', '128k', '-f', 'mp4', outputName] }
+                    );
+                    break;
+                case 'webm':
+                    A.push(
+                        { name: 'VP9 + Opus', args: ['-i', inputName, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '33', '-c:a', 'libopus', '-b:a', '128k', outputName] },
+                        { name: 'VP8 + Vorbis', args: ['-i', inputName, '-c:v', 'libvpx', '-b:v', '1M', '-c:a', 'libvorbis', '-q:a', '5', outputName] }
+                    );
+                    break;
+                case 'avi':
+                    A.push(
+                        { name: 'MPEG4 + PCM', args: ['-i', inputName, '-c:v', 'mpeg4', '-qscale:v', '3', '-c:a', 'pcm_s16le', outputName] },
+                        { name: 'MPEG4 + MP3', args: ['-i', inputName, '-c:v', 'mpeg4', '-qscale:v', '3', '-c:a', 'libmp3lame', '-b:a', '192k', outputName] }
+                    );
+                    break;
+                case 'mov':
+                    A.push(
+                        { name: '无损重封装', args: ['-i', inputName, '-c', 'copy', '-f', 'mov', outputName] },
+                        { name: 'H.264 + AAC', args: ['-i', inputName, '-c:v', 'libx264', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '128k', '-f', 'mov', outputName] },
+                        { name: 'MPEG4 + PCM', args: ['-i', inputName, '-c:v', 'mpeg4', '-qscale:v', '2', '-c:a', 'pcm_s16le', '-f', 'mov', outputName] }
+                    );
+                    break;
+                case 'gif':
+                    A.push(
+                        { name: '高质量调色板', args: [
+                            '-i', inputName,
+                            '-vf', 'fps=12,scale=iw:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=full[p];[s1][p]paletteuse=new=1',
+                            '-loop', '0', outputName
+                        ] },
+                        { name: '标准GIF', args: ['-i', inputName, '-r', '10', outputName] }
+                    );
+                    break;
+                default:
+                    // 兜底：依赖容器后缀
+                    A.push({ name: '默认策略', args: ['-i', inputName, outputName] });
+            }
+            // 最后再追加一次默认兜底，确保还有一次机会
+            if (!A.find(x => x.name === '默认策略')) {
+                A.push({ name: '默认策略', args: ['-i', inputName, outputName] });
+            }
+            return A;
+        }
+
+        function buildAudioAttempts(targetExt, inputName, outputName) {
+            const A = [];
+            switch (targetExt) {
+                case 'mp3':
+                    A.push(
+                        { name: '无损重封装', args: ['-i', inputName, '-c', 'copy', outputName] },
+                        { name: 'LAME MP3', args: ['-i', inputName, '-c:a', 'libmp3lame', '-b:a', '192k', outputName] },
+                        { name: '原生MP3', args: ['-i', inputName, '-c:a', 'mp3', '-q:a', '2', outputName] }
+                    );
+                    break;
+                case 'wav':
+                    A.push(
+                        { name: 'PCM 16-bit', args: ['-i', inputName, '-c:a', 'pcm_s16le', '-ar', '44100', '-ac', '2', outputName] }
+                    );
+                    break;
+                case 'ogg':
+                    A.push(
+                        { name: 'Opus', args: ['-i', inputName, '-c:a', 'libopus', '-b:a', '128k', outputName] },
+                        { name: 'Vorbis', args: ['-i', inputName, '-c:a', 'libvorbis', '-q:a', '5', outputName] }
+                    );
+                    break;
+                case 'm4a':
+                    A.push(
+                        { name: 'AAC in MP4', args: ['-i', inputName, '-c:a', 'aac', '-b:a', '192k', '-movflags', 'faststart', '-f', 'mp4', outputName] }
+                    );
+                    break;
+                default:
+                    A.push({ name: '默认策略', args: ['-i', inputName, outputName] });
+            }
+            if (!A.find(x => x.name === '默认策略')) {
+                A.push({ name: '默认策略', args: ['-i', inputName, outputName] });
+            }
+            return A;
         }
 
         tabs.forEach(tab => {
@@ -424,43 +691,47 @@
             if (!file) return;
             try {
                 const { ffmpeg, fetchFile } = await getFFmpeg();
-                updateProgress(60, '准备转换...', true);
+                updateProgress(20, '准备转换...', true);
 
-                const outputFilename = `${file.name.split('.').slice(0, -1).join('.')}.${formatSelect.value}`;
-                await ffmpeg.writeFile(file.name, await fetchFile(file));
-                let args = ['-i', file.name];
-                // 对 M4V 使用“重封装”（不重新编码），大幅提高成功率
-                if (type === '视频' && formatSelect.value === 'm4v') {
+                const targetExt = formatSelect.value.toLowerCase();
+                const inputName = file.name;
+                const outputName = `${file.name.split('.').slice(0, -1).join('.')}.${targetExt}`;
+
+                await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+                const attempts = type === '视频'
+                    ? buildVideoAttempts(targetExt, inputName, outputName)
+                    : buildAudioAttempts(targetExt, inputName, outputName);
+
+                let success = false; let lastErr = null;
+                for (let i = 0; i < attempts.length; i++) {
+                    const step = attempts[i];
+                    updateProgress(40, `尝试(${i + 1}/${attempts.length})：${step.name}...`, true);
                     try {
-                        args.push('-c', 'copy', '-map', '0', '-movflags', 'faststart', '-f', 'mp4', outputFilename);
-                        await ffmpeg.exec(args);
+                        await ffmpeg.exec(step.args);
+                        success = true;
+                        break;
                     } catch (e) {
-                        // 若重封装失败（例如输入编码不被MP4容器接受），回退到重新编码
-                        console.warn('M4V copy 重封装失败，尝试重新编码:', e?.message || e);
-                        updateProgress(70, '重封装失败，尝试重新编码...', true);
-                        await ffmpeg.exec([
-                            '-i', file.name,
-                            '-c:v', 'libx264', '-preset', 'veryfast',
-                            '-c:a', 'aac', '-b:a', '128k',
-                            '-movflags', 'faststart', '-f', 'mp4',
-                            outputFilename
-                        ]);
+                        lastErr = e;
+                        console.warn(`方案失败: ${step.name}`, e?.message || e);
                     }
-                } else {
-                    // 默认策略：让 ffmpeg 根据后缀决定容器/编码
-                    args.push(outputFilename);
-                    await ffmpeg.exec(args);
                 }
 
-                const data = await ffmpeg.readFile(outputFilename);
+                if (!success) throw new Error(`所有策略失败：${lastErr?.message || lastErr}`);
+
+                const data = await ffmpeg.readFile(outputName);
                 const blob = new Blob([data.buffer]);
-                const url = URL.createObjectURL(blob);
-                triggerDownload(url, outputFilename);
 
-                updateProgress(100, '转换成功！已开始下载。');
+                const saved = await pickOutputDirectoryAndSave(outputName, blob);
+                if (!saved) {
+                    const url = URL.createObjectURL(blob);
+                    triggerDownload(url, outputName);
+                }
 
-                await ffmpeg.deleteFile(file.name);
-                await ffmpeg.deleteFile(outputFilename);
+                updateProgress(100, '转换成功！文件已保存/下载。');
+
+                await ffmpeg.deleteFile(inputName).catch(()=>{});
+                await ffmpeg.deleteFile(outputName).catch(()=>{});
             } catch (error) {
                 console.error(`${type}转换失败:`, error);
                 updateProgress(100, `错误：${type}转换失败。${error.message}`);
@@ -494,6 +765,74 @@
             };
             reader.readAsDataURL(imageFile);
         });
+
+        // 绑定一键M4V按钮
+        const autoM4vBtn = document.getElementById('auto-m4v-btn');
+        if (autoM4vBtn) autoM4vBtn.addEventListener('click', autoConvertToM4V);
+
+        // ===== 自检逻辑 =====
+        function getSelectedSelfTestFormats() {
+            return Array.from(document.querySelectorAll('.selftest-format:checked')).map(el => el.value);
+        }
+        function baseNameWithoutExt(name) { const parts = name.split('.'); parts.pop(); return parts.join('.') || 'output'; }
+        async function convertOneVideo(file, targetExt) {
+            const { ffmpeg, fetchFile } = await getFFmpeg();
+            const inputName = file.name;
+            const outputName = `${baseNameWithoutExt(file.name)}.${targetExt}`;
+            await ffmpeg.writeFile(inputName, await fetchFile(file));
+            const attempts = buildVideoAttempts(targetExt, inputName, outputName);
+            let success = false, lastErr = null, used = null;
+            for (let i=0;i<attempts.length;i++){
+                const step = attempts[i];
+                updateProgress(40, `尝试(${i+1}/${attempts.length})：${step.name}...`, true);
+                try { await ffmpeg.exec(step.args); success = true; used = step.name; break; } catch(e){ lastErr = e; }
+            }
+            let result = { success, attempt: used, error: lastErr?.message || String(lastErr), filename: outputName, blob: null };
+            if (success) {
+                const data = await ffmpeg.readFile(outputName);
+                result.blob = new Blob([data.buffer]);
+            }
+            try { await ffmpeg.deleteFile(inputName); await ffmpeg.deleteFile(outputName); } catch {}
+            return result;
+        }
+        async function validatePlayable(blob) {
+            try {
+                const url = URL.createObjectURL(blob);
+                const v = document.createElement('video'); v.preload = 'metadata';
+                return await new Promise((resolve)=>{
+                    let done=false; const finish=(ok)=>{ if(done) return; done=true; URL.revokeObjectURL(url); resolve(!!ok); };
+                    v.onloadedmetadata=()=>finish(true); v.onerror=()=>finish(false); v.src=url;
+                });
+            } catch { return false; }
+        }
+        async function runSelfTest() {
+            if (!selfTestFile) return;
+            const formats = getSelectedSelfTestFormats();
+            const report = { input: selfTestFile.name, results: [] };
+            for (const fmt of formats) {
+                updateProgress(20, `准备转换为 ${fmt}...`, true);
+                const res = await convertOneVideo(selfTestFile, fmt);
+                if (res.success) {
+                    updateProgress(80, `验证 ${res.filename} 可播放性...`, true);
+                    const ok = await validatePlayable(res.blob);
+                    const saved = await saveToOutputDir(res.filename, res.blob);
+                    if (!saved) { const url = URL.createObjectURL(res.blob); triggerDownload(url, res.filename); }
+                    report.results.push({ format: fmt, success: ok, attempt: res.attempt, saved: !!saved, error: ok?null:'验证失败' });
+                } else {
+                    report.results.push({ format: fmt, success: false, attempt: res.attempt, error: res.error });
+                }
+            }
+            const reportBlob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const reportName = `SelfTest_${Date.now()}.json`;
+            const saved = await saveToOutputDir(reportName, reportBlob);
+            if (!saved) { const url = URL.createObjectURL(reportBlob); triggerDownload(url, reportName); }
+            updateProgress(100, '自检完成！报告已生成。');
+        }
+        if (selfTestDropZone && selfTestInput) {
+            setupDropZone(selfTestDropZone, selfTestInput, (e) => { selfTestFile = e.target.files[0]; if (selfTestFile) { selfTestDropZone.querySelector('p').textContent = `已选择: ${selfTestFile.name}`; selfTestRunBtn.disabled = false; } });
+        }
+        selfTestChooseDirBtn?.addEventListener('click', chooseOutputDirectory);
+        selfTestRunBtn?.addEventListener('click', runSelfTest);
 
         docConvertBtn.addEventListener('click', async () => {
             if (docFiles.length === 0) return;
