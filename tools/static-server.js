@@ -38,7 +38,11 @@ const server = http.createServer((req, res) => {
 
     const ext = path.extname(filePath).toLowerCase();
     const type = types.get(ext) || 'application/octet-stream';
-    res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' });
+    res.writeHead(200, {
+      'content-type': type,
+      'cache-control': 'no-cache',
+      'access-control-allow-origin': '*'
+    });
     fs.createReadStream(filePath).pipe(res);
   } catch (e) {
     res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });

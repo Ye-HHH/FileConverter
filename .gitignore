@@ -9,3 +9,16 @@ node_modules/
 
 # Test outputs
 输出/
+输入/
+
+# Test files
+test_*.js
+test_*.html
+auto_test.html
+simple_test.html
+run_automated_test.js
+run_test.ps1
+check_output.sh
+monitor_output.sh
+test_input.mp4
+诊断报告.txt
