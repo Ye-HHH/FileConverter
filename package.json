@@ -1,0 +1,15 @@
+{
+  "name": "fileconverter",
+  "version": "1.0.0",
+  "description": "All-in-One browser-based file format converter",
+  "scripts": {
+    "serve": "node tools/static-server.js",
+    "test": "node tools/selftest.js"
+  },
+  "keywords": ["file-converter", "ffmpeg", "wasm", "frontend"],
+  "author": "Ye-HHH",
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.55.1"
+  }
+}

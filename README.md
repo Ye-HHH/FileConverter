@@ -1,32 +1,71 @@
 # FileConverter
 
-#### [点击这里访问在线工具](https://Ye-HHH.github.io/FileConverter/)
+**纯前端文件格式转换工具 - 开箱即用，保护隐私**
 
-## 自检（全自动）
+## 🚀 [点击访问在线工具](https://Ye-HHH.github.io/FileConverter/)
 
-本仓库已内置“自检”面板（前端页面 Tab），支持在浏览器内：选择输入视频 → 批量转换为多种格式 → 自动验证可播放性 → 写入输出目录（或回退为下载）→ 生成报告 JSON。
+---
 
-此外还提供 Node 自动化脚本（可选）：
+## ✨ 功能特性
 
-1. 安装依赖（需要网络以安装 Playwright 浏览器）
+- **视频转换**: MP4, MOV, AVI, WEBM, M4V, GIF 互转
+- **音频转换**: MP3, WAV, OGG, M4A 互转
+- **图片转换**: PNG, JPEG, WEBP, BMP 互转
+- **图片转PDF**: 多张图片合并为PDF文档
+- **自检功能**: 批量转换并自动验证文件可用性
 
+## 🔐 隐私保护
+
+- ✅ **100%浏览器端处理** - 文件不上传服务器
+- ✅ **离线可用** - 集成完整依赖库
+- ✅ **无需安装** - 打开网页即可使用
+
+## 📖 使用方法
+
+### 在线使用（推荐）
+
+直接访问 [https://Ye-HHH.github.io/FileConverter/](https://Ye-HHH.github.io/FileConverter/)
+
+### 本地开发
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/Ye-HHH/FileConverter.git
+cd FileConverter
+
+# 2. 启动本地服务器
+npm run serve
+
+# 3. 访问 http://localhost:3210
 ```
-npm i -D playwright
+
+### 自动化测试
+
+```bash
+# 安装依赖
+npm install
+
+# 运行自检（需指定输入文件和输出目录）
+INPUT="/path/to/video.mp4" OUTDIR="/path/to/output" npm test
 ```
 
-2. 运行自检（默认输入/输出路径可用环境变量覆盖）
+## 🛠 技术栈
 
-```
-INPUT="/mnt/e/All In One/Downloads/格式转化.mp4" \
-OUTDIR="/mnt/e/All In One/Downloads/输出" \
-node tools/selftest.js
-```
+- [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) - 视频/音频转换引擎
+- [jsPDF](https://github.com/parallax/jsPDF) - PDF生成库
+- Canvas API - 图片格式转换
+- Tailwind CSS - UI框架
 
-脚本会：
-- 启动本地静态服务（无需后端）
-- 打开浏览器，进入“自检”页签
-- 选择输入视频，默认转换 mp4/m4v/webm
-- 拦截下载并保存到 `OUTDIR`
-- 最终在输出目录生成转换产物与 `SelfTest_*.json` 报告
+## 📝 注意事项
 
-注意：若在 GitHub Pages 上使用，页面会自动选择单线程核心（无需 COOP/COEP），可直接在浏览器完成转换。
+- 首次使用需下载 FFmpeg WASM 核心（约24MB），请耐心等待
+- GitHub Pages 环境下自动使用单线程模式，转换速度可能较慢
+- 大文件转换可能消耗较多内存，建议使用现代浏览器
+
+## 📄 许可证
+
+MIT License
+
+---
+
+**如有问题或建议，欢迎提交 [Issue](https://github.com/Ye-HHH/FileConverter/issues)**

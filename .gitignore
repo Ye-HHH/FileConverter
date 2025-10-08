@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Development files
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Test outputs
+输出/
