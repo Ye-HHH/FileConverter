@@ -517,9 +517,9 @@
             switch (targetExt) {
                 case 'mp3':
                     A.push(
-                        { name: '无损重封装', args: ['-i', inputName, '-c', 'copy', outputName] },
-                        { name: `LAME MP3 (${q.bitrate})`, args: ['-i', inputName, '-c:a', 'libmp3lame', '-b:a', q.bitrate, outputName] },
-                        { name: '原生MP3', args: ['-i', inputName, '-c:a', 'mp3', '-q:a', '2', outputName] }
+                        { name: '无损重封装', args: ['-i', inputName, '-vn', '-c', 'copy', outputName] },
+                        { name: `LAME MP3 (${q.bitrate})`, args: ['-i', inputName, '-vn', '-c:a', 'libmp3lame', '-b:a', q.bitrate, outputName] },
+                        { name: '原生MP3', args: ['-i', inputName, '-vn', '-c:a', 'mp3', '-q:a', '2', outputName] }
                     );
                     break;
                 case 'wav':
@@ -527,27 +527,27 @@
                     const wavRate = { high: '48000', medium: '44100', low: '32000' }[quality];
                     const wavBit = quality === 'high' ? 'pcm_s24le' : 'pcm_s16le';
                     A.push(
-                        { name: `PCM ${quality === 'high' ? '24-bit' : '16-bit'} (${wavRate}Hz)`, args: ['-i', inputName, '-c:a', wavBit, '-ar', wavRate, '-ac', '2', outputName] }
+                        { name: `PCM ${quality === 'high' ? '24-bit' : '16-bit'} (${wavRate}Hz)`, args: ['-i', inputName, '-vn', '-c:a', wavBit, '-ar', wavRate, '-ac', '2', outputName] }
                     );
                     break;
                 case 'ogg':
                     // Vorbis质量: -1(低)~10(高)
                     const oggQ = { high: '8', medium: '6', low: '4' }[quality];
                     A.push(
-                        { name: `Opus (${q.bitrate})`, args: ['-i', inputName, '-c:a', 'libopus', '-b:a', q.bitrate, outputName] },
-                        { name: `Vorbis (${quality})`, args: ['-i', inputName, '-c:a', 'libvorbis', '-q:a', oggQ, outputName] }
+                        { name: `Opus (${q.bitrate})`, args: ['-i', inputName, '-vn', '-c:a', 'libopus', '-b:a', q.bitrate, outputName] },
+                        { name: `Vorbis (${quality})`, args: ['-i', inputName, '-vn', '-c:a', 'libvorbis', '-q:a', oggQ, outputName] }
                     );
                     break;
                 case 'm4a':
                     A.push(
-                        { name: `AAC (${q.bitrate})`, args: ['-i', inputName, '-c:a', 'aac', '-b:a', q.bitrate, '-movflags', 'faststart', '-f', 'mp4', outputName] }
+                        { name: `AAC (${q.bitrate})`, args: ['-i', inputName, '-vn', '-c:a', 'aac', '-b:a', q.bitrate, '-movflags', 'faststart', '-f', 'mp4', outputName] }
                     );
                     break;
                 default:
-                    A.push({ name: '默认策略', args: ['-i', inputName, outputName] });
+                    A.push({ name: '默认策略', args: ['-i', inputName, '-vn', outputName] });
             }
             if (!A.find(x => x.name === '默认策略')) {
-                A.push({ name: '默认策略', args: ['-i', inputName, outputName] });
+                A.push({ name: '默认策略', args: ['-i', inputName, '-vn', outputName] });
             }
             return A;
         }
