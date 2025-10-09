@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 背景圆形 -->
+  <circle cx="32" cy="32" r="30" fill="#3b82f6"/>
+
+  <!-- 文档图标左侧 -->
+  <path d="M18 20 L18 44 L28 44 L28 20 Z" fill="white" opacity="0.9"/>
+  <rect x="20" y="24" width="6" height="2" fill="#3b82f6"/>
+  <rect x="20" y="28" width="6" height="2" fill="#3b82f6"/>
+  <rect x="20" y="32" width="4" height="2" fill="#3b82f6"/>
+
+  <!-- 转换箭头 -->
+  <path d="M30 28 L34 32 L30 36" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 28 L38 32 L34 36" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 文档图标右侧 -->
+  <path d="M36 20 L36 44 L46 44 L46 20 Z" fill="white" opacity="0.9"/>
+  <rect x="38" y="24" width="6" height="2" fill="#3b82f6"/>
+  <rect x="38" y="28" width="6" height="2" fill="#3b82f6"/>
+  <rect x="38" y="32" width="4" height="2" fill="#3b82f6"/>
+</svg>
