@@ -530,11 +530,9 @@
                     );
                     break;
                 case 'ogg':
-                    // Vorbis质量: -1(低)~10(高)
-                    const oggQ = { high: '8', medium: '6', low: '4' }[quality];
+                    // Vorbis 使用 bitrate 模式（更稳定，避免 WASM 内存问题）
                     A.push(
-                        { name: `Opus (${q.bitrate})`, args: ['-i', inputName, '-vn', '-c:a', 'libopus', '-b:a', q.bitrate, outputName] },
-                        { name: `Vorbis (${quality})`, args: ['-i', inputName, '-vn', '-c:a', 'libvorbis', '-q:a', oggQ, outputName] }
+                        { name: `Vorbis (${q.bitrate})`, args: ['-i', inputName, '-vn', '-c:a', 'libvorbis', '-b:a', q.bitrate, '-strict', '-2', outputName] }
                     );
                     break;
                 case 'm4a':
