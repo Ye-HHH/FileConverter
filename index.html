@@ -517,9 +517,8 @@
             switch (targetExt) {
                 case 'mp3':
                     A.push(
-                        { name: '无损重封装', args: ['-i', inputName, '-vn', '-c', 'copy', outputName] },
                         { name: `LAME MP3 (${q.bitrate})`, args: ['-i', inputName, '-vn', '-c:a', 'libmp3lame', '-b:a', q.bitrate, outputName] },
-                        { name: '原生MP3', args: ['-i', inputName, '-vn', '-c:a', 'mp3', '-q:a', '2', outputName] }
+                        { name: '原生MP3 (VBR)', args: ['-i', inputName, '-vn', '-c:a', 'libmp3lame', '-q:a', '2', outputName] }
                     );
                     break;
                 case 'wav':
